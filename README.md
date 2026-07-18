@@ -1,3 +1,5 @@
+![ZumbiBots](https://github.com/tbv001/ZumbiBots/blob/main/images/ZumbiBots.png)
+
 Player AI/Bots for **Zumbi Blocks 2** to simulate online gameplay without actual human players.
 
 ## Features
@@ -21,13 +23,19 @@ In order to add bots to the game, you need to be the server host. Once you've st
 
 ## Building
 
+### Prerequisites
+
 Requires [.NET SDK](https://dotnet.microsoft.com/download) (netstandard2.1).
+
+### Project References
 
 The project references `Assembly-CSharp.dll` from your Steam installation. Make sure Zumbi Blocks 2 is installed at the default Steam path, or update the path in `src/ZumbiBots.csproj`:
 
 ```xml
 <AssemblyCSharpPath>$(SteamInstallPath)\steamapps\common\Zumbi Blocks 2 Open Alpha\ZumbiBlocks2_Data\Managed\Assembly-CSharp.dll</AssemblyCSharpPath>
 ```
+
+### Compiling
 
 Build from the repository root:
 
@@ -36,6 +44,14 @@ dotnet build -c Release ./src
 ```
 
 The output DLL will be in `src/bin/Release/netstandard2.1/`.
+
+## Showcases
+
+![Showcase1](https://github.com/tbv001/ZumbiBots/blob/main/images/Showcase1.png)
+
+![Showcase2](https://github.com/tbv001/ZumbiBots/blob/main/images/Showcase2.png)
+
+![Showcase3](https://github.com/tbv001/ZumbiBots/blob/main/images/Showcase3.png)
 
 ## License
 
