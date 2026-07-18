@@ -4,10 +4,14 @@ Player AI/Bots for **Zumbi Blocks 2** to simulate online gameplay without actual
 
 ## Features
 
-- They can finish the game by themselves
-- Capable enough to survive and wipe hordes on their own
-- They prioritize helping teammates defeat active bosses
-- Some crutches so they won't be too much of a burden
+- Bots can use all firearms, melees, and throwables that are explosive
+- Bots prioritize loots based on their needs (weapons, meds, food, water)
+- Bots can engage bosses required for the wave to progress
+- Bots can light up braziers
+- Bots will help teammates defeat active bosses
+- Bots will try to revive downed teammates if possible
+- Bots manage their own inventory; they will scrap or drop useless items, and equip stronger equipment
+- Bots can interact with the rescue helicopter to start the rescue sequence
 - Randomization for the bots' loadout and character customization
 - Easy to use bot menu for managing bots during gameplay
 
