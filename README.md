@@ -30,7 +30,7 @@ In order to add bots to the game, you need to be the server host. Once you've st
 
 ### Prerequisites
 
-Requires [.NET SDK](https://dotnet.microsoft.com/download) (netstandard2.1).
+- [.NET SDK](https://dotnet.microsoft.com/download) (netstandard2.1)
 
 ### Project References
 
