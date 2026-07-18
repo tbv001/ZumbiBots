@@ -7,8 +7,9 @@ Player AI/Bots for **Zumbi Blocks 2** to simulate online gameplay without actual
 - They can finish the game by themselves
 - Capable enough to survive and wipe hordes on their own
 - They prioritize helping teammates defeat active bosses
+- Some crutches so they won't be too much of a burden
 - Randomization for the bots' loadout and character customization
-- Easy to use bot menu to manage bots during gameplay
+- Easy to use bot menu for managing bots during gameplay
 
 ## Installation
 
