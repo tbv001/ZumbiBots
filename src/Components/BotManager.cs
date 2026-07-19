@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using ZumbiBots.Classes;
 using UnityEngine;
 
@@ -8,17 +10,46 @@ public class BotManager : MonoBehaviour
 {
     private static readonly Dictionary<int, LoadoutDescriptor[]> BotItems = [];
     private static readonly HashSet<int> AppliedLoadoutThisSession = [];
+    private static readonly HashSet<string> UsedBotNames = [];
+    private static string[] _botNames;
     public static List<int> BotLobbyIDs = [];
     public static bool BotIsAvailable = false;
     public static int BotQuota;
 
+    private static void LoadBotNames()
+    {
+        if (_botNames != null)
+            return;
+
+        var assemblyPath = Assembly.GetExecutingAssembly().Location;
+        var assemblyDir = Path.GetDirectoryName(assemblyPath);
+        if (assemblyDir == null)
+            return;
+
+        var namesPath = Path.Combine(assemblyDir, "names.txt");
+        _botNames = File.Exists(namesPath) ? File.ReadAllLines(namesPath) : ["Bot"];
+    }
+
     public static void AddBot()
     {
+        LoadBotNames();
+
+        var availableNames = new List<string>();
+        foreach (var name in _botNames)
+        {
+            if (!UsedBotNames.Contains(name))
+                availableNames.Add(name);
+        }
+
+        var botName = availableNames.Count > 0
+            ? availableNames[Random.Range(0, availableNames.Count)]
+            : _botNames[Random.Range(0, _botNames.Length)];
+
+        UsedBotNames.Add(botName);
         var lobby = LobbyController.instance;
         var speaker = ServerController.instance.GetSpeaker;
         var skinId = Randomization.GetRandomSkin();
         var gender = Randomization.GetRandomGender();
-        var botName = $"Bot{BotLobbyIDs.Count + 1:D2}";
         var id = lobby.AddPlayer(null, botName, skinId, gender,
             AppearanceColorsHandler.AllocateColorsWithDefaults(skinId),
             0, true);
@@ -63,6 +94,7 @@ public class BotManager : MonoBehaviour
         lobby.RemovePlayerByLobbyID(lobbyId);
         BotLobbyIDs.Remove(lobbyId);
         BotItems.Remove(lobbyId);
+        UsedBotNames.Remove(botName);
         Logging.DebugLog($"Bot {botName} with LobbyID {lobbyId} removed.");
     }
 
@@ -82,6 +114,7 @@ public class BotManager : MonoBehaviour
             BotLobbyIDs.Clear();
             BotItems.Clear();
             AppliedLoadoutThisSession.Clear();
+            UsedBotNames.Clear();
             BotQuota = 0;
 
             return;
