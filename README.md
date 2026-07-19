@@ -4,22 +4,22 @@ Player AI/Bots for **Zumbi Blocks 2** to simulate online gameplay without actual
 
 ## Features
 
-- Bots can use all firearms, melees, and throwables that are explosive
-- Bots prioritize loots based on their needs (weapons, meds, food, water)
+- Bots can use all firearms, melee weapons, and explosive throwables
+- Bots prioritize loot based on their needs (weapons, meds, food, water)
 - Bots can engage bosses required for the wave to progress
 - Bots can light up braziers
 - Bots will help teammates defeat active bosses
 - Bots will try to revive downed teammates if possible
 - Bots manage their own inventory; they will scrap or drop useless items, and equip stronger equipment
-- Bots can interact with the rescue helicopter to start the rescue sequence
-- Randomization for the bots' loadout and character customization
-- Easy to use bot menu for managing bots during gameplay
+- Bots can interact with the rescue helicopter to start the rescue sequence and ride to escape
+- Randomized bot loadouts and character customization
+- Easy-to-use bot menu for managing bots during gameplay
 
 ## Installation
 
-1. Make sure you have the latest version of [BepInEx 5](https://github.com/BepInEx/BepInEx/releases) installed in your game
-2. Download the latest release from the [releases page](https://github.com/tbv001/ZumbiBots/releases/latest)
-3. Extract the contents of the `ZumbiBots.zip` file to the game directory
+1. Install the latest version of [BepInEx 5](https://github.com/BepInEx/BepInEx/releases) in your Zumbi Blocks 2 installation if not already installed. Make sure to run the game at least once after installing for BepInEx to generate the necessary directories
+2. Download the latest version of this mod from the [releases page](https://github.com/tbv001/ZumbiBots/releases/latest)
+3. Extract the contents of the `ZumbiBots.zip` file to the `BepInEx\plugins\` directory located in your Zumbi Blocks 2 installation directory (e.g., `C:\Program Files (x86)\Steam\steamapps\common\Zumbi Blocks 2 Open Alpha\BepInEx\plugins\`)
 4. Launch the game
 
 ## Usage
