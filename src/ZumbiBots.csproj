@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>ZumbiBots</AssemblyName>
-    <Product>Zumbi Bots</Product>
+    <Product>ZumbiBots</Product>
     <Version>$([System.DateTime]::UtcNow.ToString("yyyy.MM.dd"))</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
