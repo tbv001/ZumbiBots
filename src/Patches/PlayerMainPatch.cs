@@ -1,5 +1,6 @@
 using HarmonyLib;
 using ZumbiBots.Classes;
+using ZumbiBots.Components;
 using UnityEngine;
 
 namespace ZumbiBots.Patches;
@@ -35,7 +36,7 @@ internal static class PlayerMainPatch
             if (__instance.movement.IsRolling())
                 return false;
 
-            if (__instance.CanUseStamina())
+            if (__instance.CanUseStamina() && !BotMenu.DisableThinking)
             {
                 BotInput.AddKey(__instance, PlayerInputKey.KeyID.Roll);
                 return false;
