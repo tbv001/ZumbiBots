@@ -91,8 +91,10 @@ public static class BotInventory
             return;
         }
 
-        if (dbItem.CanScrap && dbItem.GetSubType() != DatabaseItem.SubType.Food &&
-            dbItem.GetSubType() != DatabaseItem.SubType.Healing)
+        if (dbItem.GetSubType() == DatabaseItem.SubType.Food ||
+            dbItem.GetSubType() == DatabaseItem.SubType.Healing) return;
+
+        if (dbItem.CanScrap)
         {
             ScrappingUtils.ScrapItem(item, inventory);
         }
@@ -162,8 +164,11 @@ public static class BotInventory
                 continue;
 
             var dbItem = item.GetDataBaseItem();
-            if (dbItem == null || (int)dbItem.GetSubType() != slot || dbItem.GetSubType() == DatabaseItem.SubType.Food)
+            if (dbItem == null || (int)dbItem.GetSubType() != slot || dbItem.GetSubType() == DatabaseItem.SubType.Food
+                || dbItem.GetSubType() == DatabaseItem.SubType.Healing)
+            {
                 continue;
+            }
 
             var score = GetItemScoreForSlot(item, slot, false, false);
             if (!(score <= equippedScore))
