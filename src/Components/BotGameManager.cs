@@ -89,5 +89,6 @@ public class BotGameManager : MonoBehaviour
 
         AssignRevives();
         ManageHorde();
+        BotInventory.PruneExpiredDroppedItems();
     }
 }

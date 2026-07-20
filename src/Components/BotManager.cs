@@ -115,6 +115,7 @@ public class BotManager : MonoBehaviour
             BotItems.Clear();
             AppliedLoadoutThisSession.Clear();
             UsedBotNames.Clear();
+            BotInventory.DroppedItemsByBot.Clear();
             BotQuota = 0;
 
             return;

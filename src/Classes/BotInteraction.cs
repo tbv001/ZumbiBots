@@ -275,6 +275,9 @@ public static class BotInteraction
                     if (IsLootUnderwater(loot.transform.position))
                         continue;
 
+                    if (BotInventory.IsRecentlyDroppedByBot(player, loot))
+                        continue;
+
                     var sqrDist = Helpers.DistToSqr(playerPos, loot.transform.position);
                     var priority = BotInventory.GetLootPriority(loot.item, hasGun, hasFood, hasDrink, hasHeal);
                     var isSack = loot.IsSack;

@@ -1,9 +1,24 @@
+using System.Collections.Generic;
+using UnityEngine;
+
 namespace ZumbiBots.Classes;
 
 public static class BotInventory
 {
     private static readonly CraftingRecipe.Material[] PyreFuelMaterials =
         [new(InventoryItem.ID.Wood, 50), new(InventoryItem.ID.DarkBlocks, 25)];
+
+    private const float DroppedItemExpirySeconds = 30f;
+    private const float DroppedItemMatchRadiusSqr = 2.25f;
+
+    public static readonly Dictionary<PlayerMain, List<DroppedItemEntry>> DroppedItemsByBot = new();
+
+    public struct DroppedItemEntry
+    {
+        public Vector3 Position;
+        public float Timestamp;
+        public InventoryItem.ID ItemId;
+    }
 
     public static void ManageInventory(PlayerMain player, bool needEat, bool needDrink)
     {
@@ -68,6 +83,7 @@ public static class BotInventory
             }
             else
             {
+                RecordDrop(inventory.playerMain, item);
                 inventory.RemoveItem(item);
                 inventory.DropLoot(item);
             }
@@ -77,9 +93,15 @@ public static class BotInventory
 
         if (dbItem.CanScrap && dbItem.GetSubType() != DatabaseItem.SubType.Food &&
             dbItem.GetSubType() != DatabaseItem.SubType.Healing)
+        {
             ScrappingUtils.ScrapItem(item, inventory);
+        }
         else
-            inventory.AddItem(item, true, false, false);
+        {
+            RecordDrop(inventory.playerMain, item);
+            inventory.RemoveItem(item);
+            inventory.DropLoot(item);
+        }
     }
 
     private static bool IsExplosiveThrowable(InventoryItem item)
@@ -92,7 +114,7 @@ public static class BotInventory
     {
         var inventory = player.inventory;
 
-        var throwableSlot = (int)DatabaseItem.SubType.Throwable;
+        const int throwableSlot = (int)DatabaseItem.SubType.Throwable;
         var equipped = inventory.GetEquipment(throwableSlot);
         if (!equipped.IsNone && !IsExplosiveThrowable(equipped))
         {
@@ -125,6 +147,7 @@ public static class BotInventory
             }
             else
             {
+                RecordDrop(player, item);
                 inventory.RemoveItem(item);
                 inventory.DropLoot(item);
             }
@@ -149,6 +172,12 @@ public static class BotInventory
             if (dbItem.CanScrap)
             {
                 ScrappingUtils.ScrapItem(item, inventory);
+            }
+            else
+            {
+                RecordDrop(inventory.playerMain, item);
+                inventory.RemoveItem(item);
+                inventory.DropLoot(item);
             }
         }
     }
@@ -374,5 +403,68 @@ public static class BotInventory
     {
         if (player?.inventory != null)
             CraftingRecipe.RemoveMaterialsFrom(player.inventory, PyreFuelMaterials);
+    }
+
+    public static void RecordDrop(PlayerMain player, InventoryItem item)
+    {
+        if (player == null || item == null || item.IsNone)
+            return;
+
+        var position = player.transform.position;
+        if (!DroppedItemsByBot.TryGetValue(player, out var list))
+        {
+            list = [];
+            DroppedItemsByBot[player] = list;
+        }
+
+        list.Add(new DroppedItemEntry
+        {
+            Position = position,
+            Timestamp = Time.time,
+            ItemId = item.id
+        });
+    }
+
+    public static bool IsRecentlyDroppedByBot(PlayerMain player, DroppedLoot loot)
+    {
+        if (player == null || loot == null || loot.item == null || loot.item.IsNone)
+            return false;
+
+        if (!DroppedItemsByBot.TryGetValue(player, out var list))
+            return false;
+
+        var lootPos = loot.transform.position;
+        var now = Time.time;
+        foreach (var entry in list)
+        {
+            if (now - entry.Timestamp > DroppedItemExpirySeconds)
+                continue;
+
+            if (entry.ItemId != loot.item.id)
+                continue;
+
+            if ((lootPos - entry.Position).sqrMagnitude > DroppedItemMatchRadiusSqr)
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static void PruneExpiredDroppedItems()
+    {
+        var now = Time.time;
+        var keys = new List<PlayerMain>(DroppedItemsByBot.Keys);
+        foreach (var bot in keys)
+        {
+            if (!DroppedItemsByBot.TryGetValue(bot, out var list))
+                continue;
+
+            list.RemoveAll(e => now - e.Timestamp > DroppedItemExpirySeconds);
+
+            if (list.Count == 0)
+                DroppedItemsByBot.Remove(bot);
+        }
     }
 }
