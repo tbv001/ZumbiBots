@@ -361,8 +361,8 @@ public static class BotInventory
         }
     }
 
-    public static int GetLootPriority(InventoryItem item, bool hasGun, bool hasFood, bool hasDrink,
-        bool hasHeal)
+    public static int GetLootPriority(InventoryItem item, bool hasGun, bool hasFood, bool hasDrink, bool hasHeal,
+        bool needPyreFuel)
     {
         if (item == null || item.IsNone)
             return -1;
@@ -376,20 +376,23 @@ public static class BotInventory
         switch (subType)
         {
             case DatabaseItem.SubType.PrimaryGun or DatabaseItem.SubType.SecondaryGun when !hasGun:
-                return 4;
+                return 5;
 
             case DatabaseItem.SubType.Food
                 when dbItem is DatabaseConsumable { statusID: StatusEffect.ID.Drink } && !hasDrink:
-                return 3;
+                return 4;
 
             case DatabaseItem.SubType.Food
                 when dbItem is DatabaseConsumable { statusID: StatusEffect.ID.Food } && !hasFood:
-                return 2;
+                return 3;
 
             case DatabaseItem.SubType.Healing when !hasHeal:
-                return 1;
+                return 2;
 
             default:
+                if (needPyreFuel && (item.id == InventoryItem.ID.Wood || item.id == InventoryItem.ID.DarkBlocks))
+                    return 1;
+
                 return 0;
         }
     }
