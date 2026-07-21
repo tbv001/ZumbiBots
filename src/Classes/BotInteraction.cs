@@ -240,6 +240,7 @@ public static class BotInteraction
         if (player == null || MapHash.instance == null)
             return false;
 
+        var needPyreFuel = !BotInventory.HasPyreFuel(player) && WorkbenchInteractions.instance.BurningPyreCount < 12;
         var playerPos = player.transform.position;
         var coord = MapHash.instance.GetHashCoord(playerPos);
         var lobbyId = player.lobbyPlayer?.lobbyID ?? -1;
@@ -279,7 +280,8 @@ public static class BotInteraction
                         continue;
 
                     var sqrDist = Helpers.DistToSqr(playerPos, loot.transform.position);
-                    var priority = BotInventory.GetLootPriority(loot.item, hasGun, hasFood, hasDrink, hasHeal);
+                    var priority =
+                        BotInventory.GetLootPriority(loot.item, hasGun, hasFood, hasDrink, hasHeal, needPyreFuel);
                     var isSack = loot.IsSack;
 
                     if (!IsBetterLoot(priority, sqrDist, isSack, bestPriority, bestSqrDist, bestIsSack))
