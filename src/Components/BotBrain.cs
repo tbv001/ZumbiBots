@@ -903,8 +903,11 @@ public class BotBrain : MonoBehaviour
             }
         }
 
-        if (!bestIndex.Exists || BotPlayerMain.arms.selectedItem.Equals(bestIndex))
+        var selectedItem = BotPlayerMain.arms.selectedItem;
+        if (!bestIndex.Exists || (selectedItem.SetType == bestIndex.SetType && selectedItem.Value == bestIndex.Value))
+        {
             return;
+        }
 
         PlayerInputKey.KeyID? key = null;
         if (bestIndex.SetType == EquipmentSetType.Weapon)
