@@ -37,7 +37,7 @@ internal static class ExplosionControllerPatch
             if (sourcePlayer != null)
                 damageAmount *= (sourcePlayer != bot) ? 0.1f : 0.5f;
 
-            var damage = new Damage(damageAmount, bot.transform.position,
+            var damage = new Damage(damageAmount, bot.transform.position, DamageType.Explosion,
                 new PlayerDamage(result.direction, 0.5f, true, 1f));
             Damage.ProcessDamage(bot, damage, true);
         }
