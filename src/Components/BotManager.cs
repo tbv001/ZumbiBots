@@ -305,7 +305,7 @@ public class BotManager : MonoBehaviour
                     {
                         stackCount = pack.itemQuantity
                     };
-                    inventory.AddItem(item, true, true, true);
+                    inventory.AddItem(item, LootPlacingFilter.Both);
                 }
             }
             else
@@ -315,8 +315,7 @@ public class BotManager : MonoBehaviour
                     continue;
 
                 var dbItem = ItemsBase.instance.GetItem(propId);
-                var equipIndex = (int)dbItem.GetSubType();
-                if (equipIndex < 0 || equipIndex >= inventory.equippedItem.Length)
+                if (dbItem == null)
                     continue;
 
                 var invItem = new InventoryItem(propId)
@@ -330,7 +329,15 @@ public class BotManager : MonoBehaviour
                 if (dbItem is DatabaseGun dbGun)
                     invItem.ammo = dbGun.maxAmmo;
 
-                inventory.equippedItem[equipIndex] = invItem;
+                var targetPos = inventory.FindPlaceFor(propId, invItem.stackCount, LootPlacingFilter.Equipment);
+                if (targetPos != null && targetPos.targetEquipmentIndex.Exists)
+                {
+                    inventory.SetEquipment(invItem, targetPos.targetEquipmentIndex);
+                }
+                else
+                {
+                    inventory.AddItem(invItem, LootPlacingFilter.Both);
+                }
             }
         }
 

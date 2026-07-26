@@ -16,7 +16,7 @@ internal static class LootSacksControllerPatch
             return true;
 
         var lootSackItemSet = new LootSackItemSet();
-        lootSackItemSet.AddItems(playerInventory.equippedItem.Where(item => item is { IsNone: false }));
+        lootSackItemSet.AddItems(playerInventory.equippedItems.AllItems().Where(item => item is { IsNone: false }));
         lootSackItemSet.AddItems(playerInventory.storage.items);
 
         if (!lootSackItemSet.HasItems)
