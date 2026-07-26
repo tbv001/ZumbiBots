@@ -10,11 +10,11 @@ internal static class ThrowableControllerPatch
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(ThrowableController), "ExplodeThrowable")]
-    private static void ExplodeThrowablePrefix(ThrowableInstance tInst)
+    private static void ExplodeThrowablePrefix(ThrowableInstance throwableInstance)
     {
-        if (tInst.throwingPlayer != null && Helpers.IsBot(tInst.throwingPlayer))
+        if (throwableInstance.throwingPlayer != null && Helpers.IsBot(throwableInstance.throwingPlayer))
         {
-            _overrideSourceLobbyId = tInst.throwingPlayer.lobbyPlayer.lobbyID;
+            _overrideSourceLobbyId = throwableInstance.throwingPlayer.lobbyPlayer.lobbyID;
         }
     }
 

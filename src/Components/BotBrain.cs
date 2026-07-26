@@ -946,6 +946,8 @@ public class BotBrain : MonoBehaviour
         BotPlayerMain.arms?.UpdateArms();
         BotPlayerMain.movement?.GetGround(true);
         BotPlayerMain.movement?.UpdateMovement();
+        traverse.Method("UpdatePinging").GetValue();
         BotPlayerMain.posSync?.SendUpdate();
+        traverse.Method("ProcessHitStop").GetValue();
     }
 }
