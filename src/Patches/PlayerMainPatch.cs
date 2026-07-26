@@ -57,7 +57,7 @@ internal static class PlayerMainPatch
             __instance.statusEffects.HasToxic ? FXProp.ID.ToxicBlood : FXProp.ID.Blood1, damage.hitPoint,
             Quaternion.identity, null, true);
         AudioController.instance.PlayImpact(__instance.playerAudio.gun.transform.position,
-            AudioController.ImpactFXID.CleanPunch, true);
+            MeleeImpactAudioID.CleanPunch, true);
 
         if (__instance.healthFast < 0f)
         {

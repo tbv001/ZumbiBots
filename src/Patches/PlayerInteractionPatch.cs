@@ -15,7 +15,7 @@ internal static class PlayerInteractionPatch
         if (!Helpers.IsBot(playerMain))
             return true;
 
-        if (playerMain.cam != null && playerMain.cam.camTransform != null)
+        if (playerMain.cam != null && playerMain.cam.CameraTransform != null)
             return true;
 
         if (!Physics.Raycast(BotVision.GetBotHeadPosition(playerMain), BotVision.GetBotAimingDirection(playerMain),
@@ -100,7 +100,7 @@ internal static class PlayerInteractionPatch
                 {
                     var inventoryItem = InventoryItem.CreateInventoryItem(item);
                     var lootTargetPosition = playerMain.inventory.FindPlaceFor(inventoryItem.id,
-                        inventoryItem.stackCount, true, true);
+                        inventoryItem.stackCount, LootPlacingFilter.Both);
                     if (lootTargetPosition == null)
                     {
                         playerMain.inventory.DropLoot(inventoryItem);
@@ -119,7 +119,7 @@ internal static class PlayerInteractionPatch
         else if (droppedLoot != null)
         {
             var lootTargetPosition = playerMain.inventory.FindPlaceFor(droppedLoot.item.id,
-                droppedLoot.item.stackCount, true, true);
+                droppedLoot.item.stackCount, LootPlacingFilter.Both);
             if (lootTargetPosition != null)
             {
                 if (MultiplayerController.instance.IsServer())
