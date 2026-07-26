@@ -23,6 +23,13 @@ internal static class PlayerMainPatch
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch("UpdateNonLocallyControlled")]
+    private static bool SkipUpdateNonLocallyControlledForBots(PlayerMain __instance)
+    {
+        return !Helpers.IsBot(__instance);
+    }
+
+    [HarmonyPrefix]
     [HarmonyPatch("TakeDamage")]
     private static bool BotTakeDamage(PlayerMain __instance, Damage damage)
     {
