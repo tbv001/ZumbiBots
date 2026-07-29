@@ -116,6 +116,7 @@ public class BotManager : MonoBehaviour
             AppliedLoadoutThisSession.Clear();
             UsedBotNames.Clear();
             BotInventory.DroppedItemsByBot.Clear();
+            BotInventory.BotSlots.Clear();
             BotQuota = 0;
 
             return;
@@ -126,6 +127,8 @@ public class BotManager : MonoBehaviour
             case MatchController.MatchState.Lobby:
             {
                 AppliedLoadoutThisSession.Clear();
+                BotInventory.DroppedItemsByBot.Clear();
+                BotInventory.BotSlots.Clear();
 
                 var lobby = LobbyController.instance;
                 if (lobby != null)
