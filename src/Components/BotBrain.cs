@@ -801,25 +801,28 @@ public class BotBrain : MonoBehaviour
         }
         else
         {
-            var selectedEq = BotPlayerMain.inventory?.GetEquipment(BotPlayerMain.arms.selectedItem);
-            var selectedSubType = selectedEq?.GetDataBaseItem()?.GetSubType();
-            if ((_needEat || _needDrink) && selectedSubType == DatabaseItem.SubType.Food ||
-                _needHeal && selectedSubType == DatabaseItem.SubType.Healing)
+            if (BotPlayerMain.arms != null)
             {
-                _shouldRun = false;
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
-            }
-
-            if (_shouldThrow && selectedSubType == DatabaseItem.SubType.Throwable &&
-                _targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 5f))
-            {
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
-
-                _throwTime += Time.deltaTime;
-                if (_throwTime >= 0.5f)
+                var selectedEq = BotPlayerMain.inventory?.GetEquipment(BotPlayerMain.arms.selectedItem);
+                var selectedSubType = selectedEq?.GetDataBaseItem()?.GetSubType();
+                if ((_needEat || _needDrink) && selectedSubType == DatabaseItem.SubType.Food ||
+                    _needHeal && selectedSubType == DatabaseItem.SubType.Healing)
                 {
-                    _shouldThrow = false;
-                    _throwableCooldown = Random.Range(10f, 30f);
+                    _shouldRun = false;
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                }
+
+                if (_shouldThrow && selectedSubType == DatabaseItem.SubType.Throwable &&
+                    _targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 5f))
+                {
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+
+                    _throwTime += Time.deltaTime;
+                    if (_throwTime >= 0.5f)
+                    {
+                        _shouldThrow = false;
+                        _throwableCooldown = Random.Range(10f, 30f);
+                    }
                 }
             }
         }
