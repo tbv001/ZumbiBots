@@ -26,8 +26,16 @@ public static class BotInventory
             return;
 
         var inventory = player.inventory;
+        ManagePrimaryWeaponSlots(inventory);
+
         foreach (var (equipped, eqIndex) in inventory.equippedItems.AllItemsIndexed())
         {
+            if (eqIndex.SetType == EquipmentSetType.Weapon &&
+                PlayerEquippedItems.GetWeaponSlotType(eqIndex.Value) == WeaponSlotType.PrimaryGun)
+            {
+                continue;
+            }
+
             var equippedScore = GetItemScoreForSlot(equipped, needEat, needDrink);
             InventoryItem bestItem = null;
             var bestScore = equippedScore;
@@ -63,6 +71,57 @@ public static class BotInventory
         }
 
         DiscardNonExplosiveThrowables(player);
+    }
+
+    private static bool IsPrimaryGun(InventoryItem item)
+    {
+        if (item == null || item.IsNone)
+            return false;
+
+        var dbItem = item.GetDataBaseItem();
+        return dbItem?.GetSubType() == DatabaseItem.SubType.PrimaryGun;
+    }
+
+    private static void ManagePrimaryWeaponSlots(PlayerInventory inventory)
+    {
+        var primarySlot0 = EquipmentIndex.Weapon(0);
+        var primarySlot1 = EquipmentIndex.Weapon(1);
+        var candidateGuns = new List<InventoryItem>();
+
+        var itemInSlot0 = inventory.GetEquipment(primarySlot0);
+        if (IsPrimaryGun(itemInSlot0))
+            candidateGuns.Add(itemInSlot0);
+
+        var itemInSlot1 = inventory.GetEquipment(primarySlot1);
+        if (IsPrimaryGun(itemInSlot1))
+            candidateGuns.Add(itemInSlot1);
+
+        foreach (var item in inventory.storage.items.ToArray())
+        {
+            if (!IsPrimaryGun(item))
+                continue;
+
+            candidateGuns.Add(item);
+            inventory.storage.items.Remove(item);
+        }
+
+        if (candidateGuns.Count == 0)
+            return;
+
+        candidateGuns.Sort((a, b) =>
+            GetItemScoreForSlot(b, false, false).CompareTo(GetItemScoreForSlot(a, false, false)));
+
+        var bestGun = candidateGuns[0];
+        var secondBestGun = candidateGuns.Count > 1 ? candidateGuns[1] : null;
+        inventory.equippedItems.Set(primarySlot0, InventoryItem.None);
+        inventory.equippedItems.Set(primarySlot1, InventoryItem.None);
+        inventory.SetEquipment(bestGun, primarySlot0);
+
+        if (secondBestGun != null)
+            inventory.SetEquipment(secondBestGun, primarySlot1);
+
+        for (var i = 2; i < candidateGuns.Count; i++)
+            ScrapOrStore(inventory, candidateGuns[i]);
     }
 
     private static void ScrapOrStore(PlayerInventory inventory, InventoryItem item)
