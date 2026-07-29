@@ -12,6 +12,7 @@ public static class BotInventory
     private const float DroppedItemMatchRadiusSqr = 2.25f;
 
     public static readonly Dictionary<PlayerMain, List<DroppedItemEntry>> DroppedItemsByBot = new();
+    public static readonly Dictionary<PlayerMain, ConsumableSlots> BotSlots = new();
 
     public struct DroppedItemEntry
     {
@@ -20,56 +21,23 @@ public static class BotInventory
         public InventoryItem.ID ItemId;
     }
 
-    public static void ManageInventory(PlayerMain player, bool needEat, bool needDrink)
+    public struct ConsumableSlots
+    {
+        public int DrinkIdx;
+        public int FoodIdx;
+        public int HealIdx;
+        public int ThrowableIdx;
+    }
+
+    public static void ManageInventory(PlayerMain player)
     {
         if (player?.inventory == null || ItemsBase.instance == null)
             return;
 
         var inventory = player.inventory;
         ManagePrimaryWeaponSlots(inventory);
-
-        foreach (var (equipped, eqIndex) in inventory.equippedItems.AllItemsIndexed())
-        {
-            if (eqIndex.SetType == EquipmentSetType.Weapon &&
-                PlayerEquippedItems.GetWeaponSlotType(eqIndex.Value) == WeaponSlotType.PrimaryGun)
-            {
-                continue;
-            }
-
-            var equippedScore = GetItemScoreForSlot(equipped, needEat, needDrink);
-            InventoryItem bestItem = null;
-            var bestScore = equippedScore;
-            foreach (var item in inventory.storage.items.ToArray())
-            {
-                if (item.id == InventoryItem.ID.None)
-                    continue;
-
-                var dbItem = item.GetDataBaseItem();
-                if (dbItem == null || !PlayerInventory.ItemTypeMatchesSlotIndex(item, eqIndex))
-                    continue;
-
-                var score = GetItemScoreForSlot(item, needEat, needDrink);
-                if (!(score > bestScore))
-                    continue;
-
-                bestScore = score;
-                bestItem = item;
-            }
-
-            if (bestItem != null)
-            {
-                if (equipped != null && !equipped.IsNone)
-                    ScrapOrStore(inventory, equipped);
-
-                inventory.storage.items.Remove(bestItem);
-                inventory.SetEquipment(bestItem, eqIndex);
-            }
-            else
-            {
-                ScrapInferiorStorage(inventory, eqIndex, equippedScore);
-            }
-        }
-
+        ManageOtherWeaponSlots(inventory);
+        ManageConsumableSlots(player);
         DiscardNonExplosiveThrowables(player);
     }
 
@@ -108,8 +76,7 @@ public static class BotInventory
         if (candidateGuns.Count == 0)
             return;
 
-        candidateGuns.Sort((a, b) =>
-            GetItemScoreForSlot(b, false, false).CompareTo(GetItemScoreForSlot(a, false, false)));
+        candidateGuns.Sort((a, b) => GetItemScoreForSlot(b).CompareTo(GetItemScoreForSlot(a)));
 
         var bestGun = candidateGuns[0];
         var secondBestGun = candidateGuns.Count > 1 ? candidateGuns[1] : null;
@@ -122,6 +89,214 @@ public static class BotInventory
 
         for (var i = 2; i < candidateGuns.Count; i++)
             ScrapOrStore(inventory, candidateGuns[i]);
+    }
+
+    private static void ManageOtherWeaponSlots(PlayerInventory inventory)
+    {
+        for (var w = 2; w <= 3; w++)
+        {
+            var eqIndex = EquipmentIndex.Weapon(w);
+            var equipped = inventory.GetEquipment(eqIndex);
+            var equippedScore = GetItemScoreForSlot(equipped);
+            InventoryItem bestItem = null;
+            var bestScore = equippedScore;
+
+            foreach (var item in inventory.storage.items.ToArray())
+            {
+                if (item.id == InventoryItem.ID.None)
+                    continue;
+
+                var dbItem = item.GetDataBaseItem();
+                if (dbItem == null || !PlayerInventory.ItemTypeMatchesSlotIndex(item, eqIndex))
+                    continue;
+
+                var score = GetItemScoreForSlot(item);
+                if (!(score > bestScore))
+                    continue;
+
+                bestScore = score;
+                bestItem = item;
+            }
+
+            if (bestItem != null)
+            {
+                if (equipped != null && !equipped.IsNone)
+                    ScrapOrStore(inventory, equipped);
+
+                inventory.storage.items.Remove(bestItem);
+                inventory.SetEquipment(bestItem, eqIndex);
+            }
+            else
+            {
+                ScrapInferiorStorage(inventory, eqIndex, equippedScore);
+            }
+        }
+    }
+
+    private static void ManageConsumableSlots(PlayerMain player)
+    {
+        var inventory = player.inventory;
+        if (inventory == null)
+            return;
+
+        var drinkIdx = ManageSpecificConsumableSlot(inventory, 0, IsDrink);
+        var foodIdx = ManageSpecificConsumableSlot(inventory, 1, IsFood);
+        var healIdx = ManageSpecificConsumableSlot(inventory, 2, IsHeal);
+        var throwableIdx = ManageSpecificConsumableSlot(inventory, 3, IsExplosiveThrowable);
+        BotSlots[player] = new ConsumableSlots
+        {
+            DrinkIdx = drinkIdx,
+            FoodIdx = foodIdx,
+            HealIdx = healIdx,
+            ThrowableIdx = throwableIdx
+        };
+    }
+
+    private static int ManageSpecificConsumableSlot(PlayerInventory inventory, int slotIndex,
+        System.Func<InventoryItem, bool> filter)
+    {
+        var targetEqIndex = EquipmentIndex.Misc(slotIndex);
+        var equippedInTarget = inventory.GetEquipment(targetEqIndex);
+        var equippedValid = equippedInTarget != null && !equippedInTarget.IsNone && !equippedInTarget.IsEmpty() &&
+                            filter(equippedInTarget);
+        var bestScore = equippedValid ? GetItemScoreForSlot(equippedInTarget) : -1f;
+
+        InventoryItem bestItem = equippedValid ? equippedInTarget : null;
+        var bestSourceStorageIndex = -1;
+        var bestSourceMiscSlot = equippedValid ? slotIndex : -1;
+
+        for (var i = 0; i < inventory.storage.items.Count; i++)
+        {
+            var item = inventory.storage.items[i];
+            if (item == null || item.id == InventoryItem.ID.None || item.IsEmpty() || !filter(item))
+                continue;
+
+            var score = GetItemScoreForSlot(item);
+            if (!(score > bestScore))
+                continue;
+
+            bestScore = score;
+            bestItem = item;
+            bestSourceStorageIndex = i;
+            bestSourceMiscSlot = -1;
+        }
+
+        var unlockedMiscCount = inventory.equippedItems.UnlockedMiscSlotsCount;
+        for (var m = 0; m < unlockedMiscCount; m++)
+        {
+            if (m == slotIndex)
+                continue;
+
+            var otherIndex = EquipmentIndex.Misc(m);
+            var item = inventory.GetEquipment(otherIndex);
+            if (item == null || item.IsNone || item.IsEmpty() || !filter(item))
+                continue;
+
+            var score = GetItemScoreForSlot(item);
+            if (!(score > bestScore))
+                continue;
+
+            bestScore = score;
+            bestItem = item;
+            bestSourceStorageIndex = -1;
+            bestSourceMiscSlot = m;
+        }
+
+        if (bestItem != null)
+        {
+            if (bestSourceMiscSlot == slotIndex)
+                return slotIndex;
+
+            if (bestSourceStorageIndex >= 0)
+            {
+                inventory.storage.items.RemoveAt(bestSourceStorageIndex);
+
+                if (equippedInTarget != null && !equippedInTarget.IsNone && !equippedInTarget.IsEmpty())
+                {
+                    var oldDbItem = equippedInTarget.GetDataBaseItem();
+                    if (oldDbItem != null && (oldDbItem.GetSubType() == DatabaseItem.SubType.Food ||
+                                              oldDbItem.GetSubType() == DatabaseItem.SubType.Healing))
+                    {
+                        if (!inventory.storage.items.Contains(equippedInTarget))
+                            inventory.storage.items.Add(equippedInTarget);
+                    }
+                    else
+                    {
+                        ScrapOrStore(inventory, equippedInTarget);
+                    }
+                }
+
+                inventory.SetEquipment(bestItem, targetEqIndex);
+                return slotIndex;
+            }
+
+            if (bestSourceMiscSlot >= 0)
+            {
+                var sourceEqIndex = EquipmentIndex.Misc(bestSourceMiscSlot);
+                inventory.equippedItems.Set(sourceEqIndex, equippedInTarget ?? InventoryItem.None);
+                inventory.SetEquipment(bestItem, targetEqIndex);
+                return slotIndex;
+            }
+        }
+
+        if (equippedInTarget != null && !equippedInTarget.IsNone && !equippedInTarget.IsEmpty() && !equippedValid)
+        {
+            var moved = false;
+            for (var m = 0; m < unlockedMiscCount; m++)
+            {
+                if (m == slotIndex)
+                    continue;
+
+                var otherEqIndex = EquipmentIndex.Misc(m);
+                var otherItem = inventory.GetEquipment(otherEqIndex);
+                if (otherItem == null || otherItem.IsNone || otherItem.IsEmpty())
+                {
+                    inventory.equippedItems.Set(targetEqIndex, InventoryItem.None);
+                    inventory.SetEquipment(equippedInTarget, otherEqIndex);
+                    moved = true;
+                    break;
+                }
+            }
+
+            if (!moved)
+            {
+                ScrapOrStore(inventory, equippedInTarget);
+                inventory.equippedItems.Set(targetEqIndex, InventoryItem.None);
+            }
+
+            return -1;
+        }
+
+        return equippedValid ? slotIndex : -1;
+    }
+
+    private static bool IsDrink(InventoryItem item)
+    {
+        if (item == null || item.IsNone)
+            return false;
+
+        var dbItem = item.GetDataBaseItem() as DatabaseConsumable;
+        return dbItem != null && dbItem.GetSubType() == DatabaseItem.SubType.Food &&
+               dbItem.statusID == StatusEffect.ID.Drink;
+    }
+
+    private static bool IsFood(InventoryItem item)
+    {
+        if (item == null || item.IsNone)
+            return false;
+
+        var dbItem = item.GetDataBaseItem() as DatabaseConsumable;
+        return dbItem != null && dbItem.GetSubType() == DatabaseItem.SubType.Food &&
+               dbItem.statusID == StatusEffect.ID.Food;
+    }
+
+    private static bool IsHeal(InventoryItem item)
+    {
+        if (item == null || item.IsNone)
+            return false;
+
+        var dbItem = item.GetDataBaseItem();
+        return dbItem != null && dbItem.GetSubType() == DatabaseItem.SubType.Healing;
     }
 
     private static void ScrapOrStore(PlayerInventory inventory, InventoryItem item)
@@ -234,7 +409,7 @@ public static class BotInventory
                 continue;
             }
 
-            var score = GetItemScoreForSlot(item, false, false);
+            var score = GetItemScoreForSlot(item);
             if (!(score <= equippedScore))
                 continue;
 
@@ -289,7 +464,7 @@ public static class BotInventory
         return (int)throwable.tier * 100f + explosionDmg;
     }
 
-    private static float GetItemScoreForSlot(InventoryItem item, bool needEat, bool needDrink)
+    private static float GetItemScoreForSlot(InventoryItem item)
     {
         if (item == null || item.IsNone)
             return 0f;
@@ -317,19 +492,7 @@ public static class BotInventory
             case DatabaseItem.SubType.Food:
             case DatabaseItem.SubType.Healing:
                 var consumable = dbItem as DatabaseConsumable;
-                if (consumable == null)
-                    return (int)dbItem.tier * 100f;
-
-                var consumableScore = (int)dbItem.tier * 100f + consumable.effectAmount;
-                if (subType != DatabaseItem.SubType.Food)
-                    return consumableScore;
-
-                if (needDrink && consumable.statusID == StatusEffect.ID.Drink)
-                    consumableScore += 10000f;
-                else if (needEat && consumable.statusID == StatusEffect.ID.Food)
-                    consumableScore += 5000f;
-
-                return consumableScore;
+                return consumable != null ? (int)dbItem.tier * 100f + consumable.effectAmount : (int)dbItem.tier * 100f;
 
             case DatabaseItem.SubType.Tool:
             case DatabaseItem.SubType.Misc:
@@ -373,31 +536,6 @@ public static class BotInventory
 
         var equipment = player.inventory.GetEquipment(player.arms.selectedItem);
         return equipment != null && !equipment.IsNone && equipment.GetDataBaseItem() is DatabaseMelee;
-    }
-
-    public static bool HasMatchingConsumable(PlayerMain player, bool needEat, bool needDrink)
-    {
-        if (player?.inventory == null) return false;
-        foreach (var item in player.inventory.equippedItems.AllItems())
-        {
-            if (IsConsumableMatching(item, needEat, needDrink))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsConsumableMatching(InventoryItem item, bool needEat, bool needDrink)
-    {
-        if (item == null || item.IsNone)
-            return false;
-
-        var dbItem = item.GetDataBaseItem() as DatabaseConsumable;
-        if (dbItem == null)
-            return false;
-
-        return (needDrink && dbItem.statusID == StatusEffect.ID.Drink) ||
-               (needEat && dbItem.statusID == StatusEffect.ID.Food);
     }
 
     public static void CheckNeeds(PlayerMain player, out bool hasGun, out bool hasMelee, out bool hasFood,

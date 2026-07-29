@@ -305,7 +305,7 @@ public class BotBrain : MonoBehaviour
         var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
         _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
         BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink, out _hasHeal);
-        BotInventory.ManageInventory(BotPlayerMain, _needEat, _needDrink);
+        BotInventory.ManageInventory(BotPlayerMain);
         _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
         _shouldRetreat = _hasHeal && _needHeal && (_currentTarget != null || ClosestHordeCount > 0);
 
@@ -524,8 +524,9 @@ public class BotBrain : MonoBehaviour
         }
 
         var distToHorde = Helpers.DistToSqr(BotPlayerMain.transform.position, ClosestHordePos);
-        if (_throwableCooldown <= 0f && !_shouldRetreat && ClosestHordeCount >= 10 &&
-            BotInventory.IsEquipSlotAvailable(BotPlayerMain, 3) &&
+        var hasThrowable = BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots) && slots.ThrowableIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx));
+        if (_throwableCooldown <= 0f && !_shouldRetreat && ClosestHordeCount >= 10 && hasThrowable &&
             distToHorde is >= 100f and <= 900f)
         {
             _shouldThrow = true;
@@ -785,8 +786,7 @@ public class BotBrain : MonoBehaviour
         {
             var selectedEq = BotPlayerMain.inventory?.GetEquipment(BotPlayerMain.arms.selectedItem);
             var selectedSubType = selectedEq?.GetDataBaseItem()?.GetSubType();
-            if ((_needEat || _needDrink) && BotInventory.HasMatchingConsumable(BotPlayerMain, _needEat, _needDrink) &&
-                selectedSubType == DatabaseItem.SubType.Food ||
+            if ((_needEat || _needDrink) && selectedSubType == DatabaseItem.SubType.Food ||
                 _needHeal && selectedSubType == DatabaseItem.SubType.Healing)
             {
                 _shouldRun = false;
@@ -858,21 +858,28 @@ public class BotBrain : MonoBehaviour
         if (BotPlayerMain.arms == null)
             return;
 
+        BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots);
         var bestIndex = EquipmentIndex.None;
         switch (_currentTarget)
         {
-            case var _ when _shouldThrow && BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(0)):
-                bestIndex = EquipmentIndex.Misc(0);
+            case var _ when _shouldThrow && slots.ThrowableIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.ThrowableIdx);
                 break;
 
-            case var _ when _needHeal && BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(0)):
-                bestIndex = EquipmentIndex.Misc(0);
+            case var _ when _needHeal && slots.HealIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.HealIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.HealIdx);
                 break;
 
-            case null when (_needEat || _needDrink) &&
-                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(0)) &&
-                           BotInventory.HasMatchingConsumable(BotPlayerMain, _needEat, _needDrink):
-                bestIndex = EquipmentIndex.Misc(0);
+            case null when _needDrink && slots.DrinkIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.DrinkIdx);
+                break;
+
+            case null when _needEat && slots.FoodIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.FoodIdx);
                 break;
 
             case var _ when _hasMelee && _currentTarget is { IsBoss: false }
@@ -920,10 +927,6 @@ public class BotBrain : MonoBehaviour
                 3 => PlayerInputKey.KeyID.SelectMelee,
                 _ => null
             };
-        }
-        else if (bestIndex.SetType == EquipmentSetType.Misc)
-        {
-            key = PlayerInputKey.KeyID.SelectMiscConsumable;
         }
 
         if (key.HasValue)
