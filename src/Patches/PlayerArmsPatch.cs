@@ -85,7 +85,7 @@ internal static class PlayerArmsPatch
         if (__instance.EquippedGun == null)
             return true;
 
-        var equipment = __instance.playerMain.inventory.GetEquipment(__instance.selectedWeapon);
+        var equipment = __instance.playerMain.inventory.GetEquipment(__instance.selectedItem);
         var databaseGun = equipment?.GetDataBaseItem() as DatabaseGun;
         if (databaseGun == null)
             return true;
@@ -100,7 +100,7 @@ internal static class PlayerArmsPatch
     {
         if (__instance.playerMain == null || !Helpers.IsBot(__instance.playerMain)) return true;
 
-        var equipment = __instance.playerMain.inventory.GetEquipment(__instance.selectedWeapon);
+        var equipment = __instance.playerMain.inventory.GetEquipment(__instance.selectedItem);
         var databaseGun = equipment?.GetDataBaseItem() as DatabaseGun;
         if (databaseGun == null)
             return true;

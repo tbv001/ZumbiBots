@@ -23,6 +23,13 @@ internal static class PlayerMainPatch
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch("UpdateNonLocallyControlled")]
+    private static bool SkipUpdateNonLocallyControlledForBots(PlayerMain __instance)
+    {
+        return !Helpers.IsBot(__instance);
+    }
+
+    [HarmonyPrefix]
     [HarmonyPatch("TakeDamage")]
     private static bool BotTakeDamage(PlayerMain __instance, Damage damage)
     {
@@ -53,11 +60,20 @@ internal static class PlayerMainPatch
         if (__instance.healthSlow < __instance.MaxHealth * 0.25f)
             __instance.healthSlow = __instance.MaxHealth * 0.25f;
 
-        FXPropsController.instance.SpawnProp(
-            __instance.statusEffects.HasToxic ? FXProp.ID.ToxicBlood : FXProp.ID.Blood1, damage.hitPoint,
-            Quaternion.identity, null, true);
+        if (damage.hitPoint == Vector3.zero)
+            damage.hitPoint = __instance.transform.position + Vector3.up * 0.8f;
+
         AudioController.instance.PlayImpact(__instance.playerAudio.gun.transform.position,
-            AudioController.ImpactFXID.CleanPunch, true);
+            MeleeImpactAudioID.CleanPunch, true);
+
+        if (damage.damageType == DamageType.Toxic)
+        {
+            SharedParticlesManager.Emit(SharedParticleID.ToxicBlood, 20, damage.hitPoint, true);
+        }
+        else
+        {
+            SharedParticlesManager.Emit(__instance.GetBloodParticles(damage.amount), damage.hitPoint, true);
+        }
 
         if (__instance.healthFast < 0f)
         {

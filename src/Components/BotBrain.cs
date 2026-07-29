@@ -305,7 +305,7 @@ public class BotBrain : MonoBehaviour
         var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
         _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
         BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink, out _hasHeal);
-        BotInventory.ManageInventory(BotPlayerMain, _needEat, _needDrink);
+        BotInventory.ManageInventory(BotPlayerMain);
         _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
         _shouldRetreat = _hasHeal && _needHeal && (_currentTarget != null || ClosestHordeCount > 0);
 
@@ -330,8 +330,8 @@ public class BotBrain : MonoBehaviour
         if (!_shouldRetreat && BotTargetting.GetClosestAny(BotPlayerMain, out _currentTarget)
                             && _currentTarget.health.isAlive)
         {
-            var isMelee = BotPlayerMain.arms?.selectedWeapon == 2 && ClosestHordeCount <= 2 && !_currentTarget.IsBoss;
-
+            var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
+            var isMelee = (isHoldingMelee || !_hasGun) && ClosestHordeCount <= 2 && !_currentTarget.IsBoss;
             if ((isMelee && !_currentTarget.IsBoss) || _hasGun)
             {
                 var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, _currentTarget);
@@ -341,10 +341,16 @@ public class BotBrain : MonoBehaviour
                 {
                     _shouldStrafe = false;
                     _targetMovePos = _currentTarget.obj.transform.position;
+
+                    var equippedMelee = BotPlayerMain.arms?.EquippedMelee;
+                    var baseReach = equippedMelee != null ? equippedMelee.reach : 0.8f;
+                    var inMeleeState = BotPlayerMain.movement?.GetEffectiveState() == PlayerMovement.State.Melee;
+                    var effectiveReach = inMeleeState ? baseReach + 2.0f : baseReach + 1.0f;
+
                     _shouldShoot = Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, 2f);
+                        _currentTarget.obj.transform.position, effectiveReach);
                     _shouldRun = !Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, 4f);
+                        _currentTarget.obj.transform.position, effectiveReach + 1.0f);
                 }
                 else
                 {
@@ -523,8 +529,9 @@ public class BotBrain : MonoBehaviour
         }
 
         var distToHorde = Helpers.DistToSqr(BotPlayerMain.transform.position, ClosestHordePos);
-        if (_throwableCooldown <= 0f && !_shouldRetreat && ClosestHordeCount >= 10 &&
-            BotInventory.IsEquipSlotAvailable(BotPlayerMain, 3) &&
+        var hasThrowable = BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots) && slots.ThrowableIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx));
+        if (_throwableCooldown <= 0f && !_shouldRetreat && ClosestHordeCount >= 10 && hasThrowable &&
             distToHorde is >= 100f and <= 900f)
         {
             _shouldThrow = true;
@@ -767,37 +774,55 @@ public class BotBrain : MonoBehaviour
     private void UpdateBotInput()
     {
         // Bot shooting & item use
-        var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain);
-        if (_shouldShoot && (BotInventory.IsHoldingGun(BotPlayerMain) || isHoldingMelee))
+        var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
+        var inMeleeState = BotPlayerMain.movement?.GetEffectiveState() == PlayerMovement.State.Melee;
+        if (_shouldShoot && (BotInventory.IsHoldingGun(BotPlayerMain) || isHoldingMelee || inMeleeState))
         {
-            if (!isHoldingMelee)
+            if (isHoldingMelee || inMeleeState)
+            {
+                var fovThreshold = inMeleeState ? 120f : 60f;
+                if (_targetLookPos.HasValue &&
+                    BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, fovThreshold))
+                {
+                    var whichAttack = Random.Range(0f, 100f);
+                    BotInput.AddKey(BotPlayerMain,
+                        whichAttack <= 50f ? PlayerInputKey.KeyID.Shoot : PlayerInputKey.KeyID.Aim);
+                }
+            }
+            else
+            {
                 BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Aim);
 
-            if (_targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 15f))
-            {
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                if (_targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 15f))
+                {
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                }
             }
         }
         else
         {
-            if ((_needEat || _needDrink) && BotInventory.HasMatchingConsumable(BotPlayerMain, _needEat, _needDrink) &&
-                BotPlayerMain.arms.selectedWeapon == 4 ||
-                _needHeal && BotPlayerMain.arms.selectedWeapon == 6)
+            if (BotPlayerMain.arms != null)
             {
-                _shouldRun = false;
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
-            }
-
-            if (_shouldThrow && BotPlayerMain.arms.selectedWeapon == 3 &&
-                _targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 5f))
-            {
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
-
-                _throwTime += Time.deltaTime;
-                if (_throwTime >= 0.5f)
+                var selectedEq = BotPlayerMain.inventory?.GetEquipment(BotPlayerMain.arms.selectedItem);
+                var selectedSubType = selectedEq?.GetDataBaseItem()?.GetSubType();
+                if ((_needEat || _needDrink) && selectedSubType == DatabaseItem.SubType.Food ||
+                    _needHeal && selectedSubType == DatabaseItem.SubType.Healing)
                 {
-                    _shouldThrow = false;
-                    _throwableCooldown = Random.Range(10f, 30f);
+                    _shouldRun = false;
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                }
+
+                if (_shouldThrow && selectedSubType == DatabaseItem.SubType.Throwable &&
+                    _targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 5f))
+                {
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+
+                    _throwTime += Time.deltaTime;
+                    if (_throwTime >= 0.5f)
+                    {
+                        _shouldThrow = false;
+                        _throwableCooldown = Random.Range(10f, 30f);
+                    }
                 }
             }
         }
@@ -853,56 +878,85 @@ public class BotBrain : MonoBehaviour
         if (BotPlayerMain.arms == null)
             return;
 
-        var bestSlot = -1;
+        BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots);
+        var bestIndex = EquipmentIndex.None;
         switch (_currentTarget)
         {
-            case var _ when _shouldThrow && BotInventory.IsEquipSlotAvailable(BotPlayerMain, 3):
-                bestSlot = 3;
+            case var _ when _shouldThrow && slots.ThrowableIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.ThrowableIdx);
                 break;
 
-            case var _ when _needHeal && BotInventory.IsEquipSlotAvailable(BotPlayerMain, 6):
-                bestSlot = 6;
+            case var _ when _needHeal && slots.HealIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.HealIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.HealIdx);
                 break;
 
-            case null when (_needEat || _needDrink) && BotInventory.IsEquipSlotAvailable(BotPlayerMain, 4) &&
-                           BotInventory.HasMatchingConsumable(BotPlayerMain, _needEat, _needDrink):
-                bestSlot = 4;
+            case null when _needDrink && slots.DrinkIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.DrinkIdx);
+                break;
+
+            case null when _needEat && slots.FoodIdx >= 0 &&
+                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
+                bestIndex = EquipmentIndex.Misc(slots.FoodIdx);
                 break;
 
             case var _ when _hasMelee && _currentTarget is { IsBoss: false }
                                       && ClosestHordeCount <= 2 && !_alwaysUseGun:
             {
-                if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 2)) bestSlot = 2;
-                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 0)) bestSlot = 0;
-                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 1)) bestSlot = 1;
+                if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(3)))
+                    bestIndex = EquipmentIndex.Weapon(3);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(0)))
+                    bestIndex = EquipmentIndex.Weapon(0);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(1)))
+                    bestIndex = EquipmentIndex.Weapon(1);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(2)))
+                    bestIndex = EquipmentIndex.Weapon(2);
                 break;
             }
 
             default:
             {
-                if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 0)) bestSlot = 0;
-                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 1)) bestSlot = 1;
-                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, 2)) bestSlot = 2;
+                if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(0)))
+                    bestIndex = EquipmentIndex.Weapon(0);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(1)))
+                    bestIndex = EquipmentIndex.Weapon(1);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(2)))
+                    bestIndex = EquipmentIndex.Weapon(2);
+                else if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(3)))
+                    bestIndex = EquipmentIndex.Weapon(3);
                 break;
             }
         }
 
-        if (BotPlayerMain.arms.selectedWeapon == bestSlot)
-            return;
-
-        if (bestSlot == -1)
-            return;
-
-        var key = bestSlot switch
+        var selectedItem = BotPlayerMain.arms.selectedItem;
+        if (!bestIndex.Exists || (selectedItem.SetType == bestIndex.SetType && selectedItem.Value == bestIndex.Value))
         {
-            0 => PlayerInputKey.KeyID.SelectPrimary,
-            1 => PlayerInputKey.KeyID.SelectSecondary,
-            2 => PlayerInputKey.KeyID.SelectMelee,
-            3 => PlayerInputKey.KeyID.SelectThrowable,
-            4 => PlayerInputKey.KeyID.SelectConsumable,
-            _ => PlayerInputKey.KeyID.SelectHealing // Slot is 6
-        };
-        BotInput.AddKey(BotPlayerMain, key);
+            return;
+        }
+
+        PlayerInputKey.KeyID? key = null;
+        if (bestIndex.SetType == EquipmentSetType.Weapon)
+        {
+            key = bestIndex.Value switch
+            {
+                0 => PlayerInputKey.KeyID.SelectPrimary1,
+                1 => PlayerInputKey.KeyID.SelectPrimary2,
+                2 => PlayerInputKey.KeyID.SelectPistol,
+                3 => PlayerInputKey.KeyID.SelectMelee,
+                _ => null
+            };
+        }
+
+        if (key.HasValue)
+        {
+            BotInput.AddKey(BotPlayerMain, key.Value);
+        }
+        else
+        {
+            BotPlayerMain.arms.targetEquipment = bestIndex;
+        }
     }
 
     private void UpdateBotControlled()
@@ -915,6 +969,8 @@ public class BotBrain : MonoBehaviour
         BotPlayerMain.arms?.UpdateArms();
         BotPlayerMain.movement?.GetGround(true);
         BotPlayerMain.movement?.UpdateMovement();
+        traverse.Method("UpdatePinging").GetValue();
         BotPlayerMain.posSync?.SendUpdate();
+        traverse.Method("ProcessHitStop").GetValue();
     }
 }

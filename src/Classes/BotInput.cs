@@ -27,10 +27,11 @@ public static class BotInput
         var dir = (pos - transform.position);
         var distance2D = new Vector2(dir.x, dir.z).magnitude;
         var pitchAngle = Mathf.Atan2(dir.y, distance2D) * Mathf.Rad2Deg;
-        playerMain.cam?.angle = Mathf.Lerp(playerMain.cam.angle, Mathf.Clamp(pitchAngle, -80f, 80f),
-            Time.deltaTime * _aimSpeed);
-        playerMain.SpineControl?.camAng = Mathf.Lerp(playerMain.SpineControl.camAng, Mathf.Clamp(pitchAngle, -80f, 80f),
-            Time.deltaTime * _aimSpeed);
+        var targetPitch = Mathf.Clamp(pitchAngle, -80f, 80f);
+        if (playerMain.SpineControl != null)
+        {
+            playerMain.SpineControl.camAng = Mathf.Lerp(playerMain.SpineControl.camAng, targetPitch, Time.deltaTime * _aimSpeed);
+        }
 
         dir.y = 0;
         if (dir.sqrMagnitude > 0.01f)
