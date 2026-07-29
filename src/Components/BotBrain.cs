@@ -330,9 +330,8 @@ public class BotBrain : MonoBehaviour
         if (!_shouldRetreat && BotTargetting.GetClosestAny(BotPlayerMain, out _currentTarget)
                             && _currentTarget.health.isAlive)
         {
-            var isMelee = BotInventory.IsHoldingMelee(BotPlayerMain) && ClosestHordeCount <= 2 &&
-                          !_currentTarget.IsBoss;
-
+            var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
+            var isMelee = (isHoldingMelee || !_hasGun) && ClosestHordeCount <= 2 && !_currentTarget.IsBoss;
             if ((isMelee && !_currentTarget.IsBoss) || _hasGun)
             {
                 var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, _currentTarget);
@@ -342,10 +341,16 @@ public class BotBrain : MonoBehaviour
                 {
                     _shouldStrafe = false;
                     _targetMovePos = _currentTarget.obj.transform.position;
+
+                    var equippedMelee = BotPlayerMain.arms?.EquippedMelee;
+                    var baseReach = equippedMelee != null ? equippedMelee.reach : 0.8f;
+                    var inMeleeState = BotPlayerMain.movement?.GetEffectiveState() == PlayerMovement.State.Melee;
+                    var effectiveReach = inMeleeState ? baseReach + 2.0f : baseReach + 1.0f;
+
                     _shouldShoot = Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, 2f);
+                        _currentTarget.obj.transform.position, effectiveReach);
                     _shouldRun = !Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, 4f);
+                        _currentTarget.obj.transform.position, effectiveReach + 1.0f);
                 }
                 else
                 {
@@ -769,17 +774,29 @@ public class BotBrain : MonoBehaviour
     private void UpdateBotInput()
     {
         // Bot shooting & item use
-        var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain);
-        if (_shouldShoot && (BotInventory.IsHoldingGun(BotPlayerMain) || isHoldingMelee))
+        var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
+        var inMeleeState = BotPlayerMain.movement?.GetEffectiveState() == PlayerMovement.State.Melee;
+        if (_shouldShoot && (BotInventory.IsHoldingGun(BotPlayerMain) || isHoldingMelee || inMeleeState))
         {
-            if (!isHoldingMelee)
+            if (isHoldingMelee || inMeleeState)
+            {
+                var fovThreshold = inMeleeState ? 120f : 60f;
+                if (_targetLookPos.HasValue &&
+                    BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, fovThreshold))
+                {
+                    var whichAttack = Random.Range(0f, 100f);
+                    BotInput.AddKey(BotPlayerMain,
+                        whichAttack <= 50f ? PlayerInputKey.KeyID.Shoot : PlayerInputKey.KeyID.Aim);
+                }
+            }
+            else
             {
                 BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Aim);
-            }
 
-            if (_targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 15f))
-            {
-                BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                if (_targetLookPos.HasValue && BotVision.IsPosWithinFov(BotPlayerMain, _targetLookPos.Value, 15f))
+                {
+                    BotInput.AddKey(BotPlayerMain, PlayerInputKey.KeyID.Shoot);
+                }
             }
         }
         else
