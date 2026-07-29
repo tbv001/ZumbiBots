@@ -88,7 +88,7 @@ public static class BotInventory
             inventory.SetEquipment(secondBestGun, primarySlot1);
 
         for (var i = 2; i < candidateGuns.Count; i++)
-            ScrapOrStore(inventory, candidateGuns[i]);
+            ScrapOrDrop(inventory, candidateGuns[i]);
     }
 
     private static void ManageOtherWeaponSlots(PlayerInventory inventory)
@@ -121,7 +121,7 @@ public static class BotInventory
             if (bestItem != null)
             {
                 if (equipped != null && !equipped.IsNone)
-                    ScrapOrStore(inventory, equipped);
+                    ScrapOrDrop(inventory, equipped);
 
                 inventory.storage.items.Remove(bestItem);
                 inventory.SetEquipment(bestItem, eqIndex);
@@ -222,7 +222,7 @@ public static class BotInventory
                     }
                     else
                     {
-                        ScrapOrStore(inventory, equippedInTarget);
+                        ScrapOrDrop(inventory, equippedInTarget);
                     }
                 }
 
@@ -260,7 +260,7 @@ public static class BotInventory
 
             if (!moved)
             {
-                ScrapOrStore(inventory, equippedInTarget);
+                ScrapOrDrop(inventory, equippedInTarget);
                 inventory.equippedItems.Set(targetEqIndex, InventoryItem.None);
             }
 
@@ -299,7 +299,7 @@ public static class BotInventory
         return dbItem != null && dbItem.GetSubType() == DatabaseItem.SubType.Healing;
     }
 
-    private static void ScrapOrStore(PlayerInventory inventory, InventoryItem item)
+    private static void ScrapOrDrop(PlayerInventory inventory, InventoryItem item)
     {
         var dbItem = item.GetDataBaseItem();
         if (dbItem == null)
