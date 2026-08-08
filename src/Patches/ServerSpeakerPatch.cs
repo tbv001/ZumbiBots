@@ -46,4 +46,61 @@ internal static class ServerSpeakerPatch
 
         return false;
     }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(ServerSpeaker.TreatLobbyLoadoutRequest))]
+    private static bool FixBotLoadoutSync(ServerSpeaker __instance, int lobbyID)
+    {
+        if (lobbyID == 0)
+        {
+            if (LoadoutSelector.instance != null)
+            {
+                LoadoutSelector.instance.SyncLobbyLoadout();
+            }
+
+            return false;
+        }
+
+        var player = LobbyController.instance?.GetPlayerByLobbyID(lobbyID);
+        if (player == null)
+        {
+            return false;
+        }
+
+        if (player.connection != null)
+        {
+            NetMatchMessage.LobbyLoadoutRequest(__instance.sendBuffer, lobbyID);
+            __instance.SendBuffer(ServerController.PacketReliability.Unreliable, player.connection.ConnectionID);
+        }
+        else
+        {
+            InventoryItem.ID[] items = null;
+            var playerIndex = LobbyController.instance?.GetPlayerIndex(lobbyID) ?? -1;
+            var lobbyMenu = LobbyController.instance?.lobbyMenu;
+            if (lobbyMenu?.slots != null && playerIndex >= 0 && playerIndex < lobbyMenu.slots.Length)
+            {
+                var slot = lobbyMenu.slots[playerIndex];
+                if (slot != null)
+                {
+                    var equippedItems = Traverse.Create(slot).Field<LobbyEquippedItems>("equippedItems").Value;
+                    items = equippedItems?.Items;
+                }
+            }
+
+            if (items == null || items.Length < 4)
+            {
+                items =
+                [
+                    InventoryItem.ID.None,
+                    InventoryItem.ID.None,
+                    InventoryItem.ID.None,
+                    InventoryItem.ID.None
+                ];
+            }
+
+            __instance.BroadcastLobbyLoadout(-1, lobbyID, player.loadoutLevel, items, player.perks ?? []);
+        }
+
+        return false;
+    }
 }
