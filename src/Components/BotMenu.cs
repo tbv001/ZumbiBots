@@ -77,8 +77,10 @@ public class BotMenu : MonoBehaviour
 
     private static void ModifyBotAmount(int amount)
     {
-        var humans = LobbyController.instance.players.Count - BotManager.BotLobbyIDs.Count;
-        var maxBots = Math.Max(0, 6 - humans);
+        var isSinglePlayer = MultiplayerController.instance?.IsSinglePlayer ?? true;
+        var humans = (LobbyController.instance?.players?.Count ?? 1) - BotManager.BotLobbyIDs.Count;
+        var maxPlayers = ServerController.instance?.ConfiguredMaxPlayers ?? 6;
+        var maxBots = isSinglePlayer ? 5 : Math.Max(0, maxPlayers - humans);
         BotManager.BotQuota = Math.Clamp(BotManager.BotQuota + amount, 0, maxBots);
     }
 
