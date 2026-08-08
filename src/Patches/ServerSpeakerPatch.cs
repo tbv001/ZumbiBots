@@ -33,7 +33,7 @@ internal static class ServerSpeakerPatch
     private static bool SkipBotBroadcasts(Buffer targetBuffer, ServerController.PacketReliability reliability,
         int ignoreLobbyID, int ignoreConnectionID)
     {
-        foreach (LobbyPlayer player in LobbyController.instance.players)
+        foreach (var player in LobbyController.instance.players)
         {
             if (player.type == LobbyPlayer.Type.Client && player.IsInGame && player.connection != null &&
                 (ignoreLobbyID < 0 || player.lobbyID != ignoreLobbyID) &&
