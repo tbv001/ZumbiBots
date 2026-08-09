@@ -26,6 +26,7 @@ public class BotBrain : MonoBehaviour
     private float _doorInteractCd;
     private float _backupTimer;
     private float _statDebugTimer;
+    private float _needsTimer;
 
     // Stuck handling
     private Vector3 _lastStuckPos;
@@ -135,9 +136,6 @@ public class BotBrain : MonoBehaviour
         _shouldInteract = false;
         _shouldStrafe = false;
         _moveNoMatterWhat = false;
-        _needEat = false;
-        _needDrink = false;
-        _needHeal = false;
         _lootIsSack = false;
         _shouldRetreat = false;
         _alwaysUseGun = false;
@@ -270,43 +268,45 @@ public class BotBrain : MonoBehaviour
         }
 
         // Needs
-        if (BotPlayerMain.statusEffects?.statusEffect != null)
+        _needsTimer += Time.deltaTime;
+        if (_needsTimer > 1f)
         {
-            foreach (var effect in BotPlayerMain.statusEffects.statusEffect)
+            _needsTimer = 0f;
+            if (BotPlayerMain.statusEffects?.statusEffect != null)
             {
-                if (effect == null)
-                    continue;
-
-                switch (effect.id)
+                foreach (var effect in BotPlayerMain.statusEffects.statusEffect)
                 {
-                    case StatusEffect.ID.Drink:
-                    {
-                        var effectPercentage = effect.curValue / effect.maxValue;
-                        if (effectPercentage > 0.5f)
-                            continue;
+                    if (effect == null)
+                        continue;
 
-                        _needDrink = true;
-                        break;
-                    }
-                    case StatusEffect.ID.Food:
+                    switch (effect.id)
                     {
-                        var effectPercentage = effect.curValue / effect.maxValue;
-                        if (effectPercentage > 0.5f)
-                            continue;
-
-                        _needEat = true;
-                        break;
+                        case StatusEffect.ID.Drink:
+                        {
+                            var effectPercentage = effect.curValue / effect.maxValue;
+                            _needDrink = effectPercentage < 0.5f;
+                            break;
+                        }
+                        case StatusEffect.ID.Food:
+                        {
+                            var effectPercentage = effect.curValue / effect.maxValue;
+                            _needEat = effectPercentage < 0.5f;
+                            break;
+                        }
                     }
                 }
             }
+
+            var maxHealthPercentage = BotPlayerMain.healthSlow / BotPlayerMain.MaxHealth;
+            var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
+            _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
+
+            BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink,
+                out _hasHeal);
+            BotInventory.ManageInventory(BotPlayerMain);
+            _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
         }
 
-        var maxHealthPercentage = BotPlayerMain.healthSlow / BotPlayerMain.MaxHealth;
-        var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
-        _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
-        BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink, out _hasHeal);
-        BotInventory.ManageInventory(BotPlayerMain);
-        _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
         _shouldRetreat = _hasHeal && _needHeal && (CurrentTarget != null || ClosestHordeCount > 0);
 
         // Retreat
