@@ -14,7 +14,7 @@ public class BotBrain : MonoBehaviour
     private Vector3? _targetLookPos;
     private Vector3? _backupPos;
     public Zombie CurrentTarget;
-    private Zombie _bossTarget;
+    public Zombie BossTarget;
     private Zombie _waveTarget;
     private bool _moveNoMatterWhat;
     private bool _heliIsHere;
@@ -467,7 +467,7 @@ public class BotBrain : MonoBehaviour
         }
 
         // Engage closest inactive boss corresponding to current wave
-        if (!_shouldRetreat && _hasEverything && TargetRevive == null && !BotTargetting.IsABossActive() &&
+        if (!_shouldRetreat && _hasEverything && TargetRevive == null && !BotGameManager.IsBossActive &&
             !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss && !_heliIsHere)
         {
             var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
@@ -490,18 +490,17 @@ public class BotBrain : MonoBehaviour
         }
 
         // Engage active closest boss
-        if (_hasGun && !_shouldRetreat && TargetRevive == null && BotTargetting.IsABossActive() && !_heliIsHere)
+        if (_hasGun && !_shouldRetreat && TargetRevive == null && BotGameManager.IsBossActive && !_heliIsHere)
         {
-            BotTargetting.GetClosestBoss(BotPlayerMain, out _bossTarget);
             _alwaysUseGun = true;
-            if (_bossTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, _bossTarget))
+            if (BossTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, BossTarget))
             {
-                _targetMovePos = _bossTarget.obj.transform.position;
+                _targetMovePos = BossTarget.obj.transform.position;
             }
         }
         else
         {
-            _bossTarget = null;
+            BossTarget = null;
         }
 
         // Engage current active wave zombies

@@ -6,6 +6,7 @@ namespace ZumbiBots.Components;
 public class BotGameManager : MonoBehaviour
 {
     private float _processTime;
+    public static bool IsBossActive;
 
     private static void AssignTargets()
     {
@@ -26,6 +27,29 @@ public class BotGameManager : MonoBehaviour
             if (BotTargetting.GetClosestAny(bot, out var currentTarget))
             {
                 brain.CurrentTarget = currentTarget;
+            }
+        }
+    }
+
+    private static void AssignBossTargets()
+    {
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        foreach (var bot in players)
+        {
+            if (bot == null)
+                continue;
+
+            var brain = bot.GetComponent<BotBrain>();
+            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+                continue;
+
+            brain.BossTarget = null;
+            if (BotTargetting.GetClosestBoss(bot, out var bossTarget))
+            {
+                brain.BossTarget = bossTarget;
             }
         }
     }
@@ -117,7 +141,10 @@ public class BotGameManager : MonoBehaviour
             return;
 
         _processTime = 0f;
+        IsBossActive = BotTargetting.IsABossActive();
+
         AssignTargets();
+        AssignBossTargets();
         AssignRevives();
         ManageHorde();
         BotInventory.PruneExpiredDroppedItems();
