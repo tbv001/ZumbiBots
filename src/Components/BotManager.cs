@@ -284,13 +284,21 @@ public class BotManager : MonoBehaviour
         Logging.DebugLog(
             $"Bot {lobbyId} loadout: [{string.Join(", ", itemNames)}] Perks: [{string.Join(", ", selectedPerks)}] Total Tier: {totalTier}");
 
+        var lobbyWeaponItems = new[]
+        {
+            descriptors[0]?.GetPropID() ?? InventoryItem.ID.None,
+            InventoryItem.ID.None,
+            descriptors[1]?.GetPropID() ?? InventoryItem.ID.None,
+            descriptors[2]?.GetPropID() ?? InventoryItem.ID.None
+        };
+
         var index = lobby?.GetPlayerIndex(lobbyId) ?? -1;
         if (index >= 0)
         {
-            lobby?.lobbyMenu.slots[index].UpdateWithLoadout(player, totalTier, items);
+            lobby?.lobbyMenu.slots[index].UpdateWithLoadout(player, totalTier, lobbyWeaponItems);
         }
 
-        ServerController.instance?.GetSpeaker?.BroadcastLobbyLoadout(-1, lobbyId, totalTier, items, selectedPerks);
+        ServerController.instance?.GetSpeaker?.BroadcastLobbyLoadout(-1, lobbyId, totalTier, lobbyWeaponItems, selectedPerks);
     }
 
     private static void ApplyBotLoadout(PlayerInventory inventory, LoadoutDescriptor[] descriptors)
