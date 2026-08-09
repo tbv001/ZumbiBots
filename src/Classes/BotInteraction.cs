@@ -377,7 +377,7 @@ public static class BotInteraction
                         continue;
 
                     var toSpotDir = new Vector2(toSpot.x, toSpot.z).normalized;
-                    if (Vector2.Dot(dir2D.normalized, toSpotDir) < 0.5f)
+                    if (Vector2.Dot(dir2D.normalized, toSpotDir) < 0.2f)
                         continue;
 
                     if (sqrDist < closestSqrDist)

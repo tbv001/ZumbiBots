@@ -78,6 +78,10 @@ public class BotBrain : MonoBehaviour
     private Vector3? _randomPos;
     private float _randomPosTimer;
 
+    // Vault spot
+    private float _vaultSpotTimer;
+    private Vector3? _vaultSpotPos;
+
     // Bot input
     private bool _shouldShoot;
     private bool _shouldRun;
@@ -746,9 +750,19 @@ public class BotBrain : MonoBehaviour
         }
 
         var moveDir = resultingMoveVec - BotPlayerMain.transform.position;
-        if (BotInteraction.TryGetClosestVaultSpot(BotPlayerMain.transform.position, moveDir, out var vaultPos))
+        _vaultSpotTimer += Time.deltaTime;
+        if (_vaultSpotTimer > 0.1f)
         {
-            _targetLookPos = vaultPos;
+            _vaultSpotTimer = 0f;
+            _vaultSpotPos =
+                BotInteraction.TryGetClosestVaultSpot(BotPlayerMain.transform.position, moveDir, out var vaultPos)
+                    ? vaultPos
+                    : null;
+        }
+
+        if (_vaultSpotPos.HasValue)
+        {
+            _targetLookPos = _vaultSpotPos.Value;
             _shouldJump = true;
         }
 
