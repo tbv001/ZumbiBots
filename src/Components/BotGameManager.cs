@@ -5,6 +5,8 @@ namespace ZumbiBots.Components;
 
 public class BotGameManager : MonoBehaviour
 {
+    private float _processTime;
+
     private static void AssignRevives()
     {
         var players = PlayersController.instance?.players;
@@ -87,6 +89,11 @@ public class BotGameManager : MonoBehaviour
         if (MatchController.instance?.state != MatchController.MatchState.InGame)
             return;
 
+        _processTime += Time.deltaTime;
+        if (_processTime < 0.1f)
+            return;
+
+        _processTime = 0f;
         AssignRevives();
         ManageHorde();
         BotInventory.PruneExpiredDroppedItems();
