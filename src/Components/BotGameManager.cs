@@ -113,6 +113,30 @@ public class BotGameManager : MonoBehaviour
         }
     }
 
+    private static void AssignClosestLoot()
+    {
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        foreach (var bot in players)
+        {
+            if (bot == null)
+                continue;
+
+            var brain = bot.GetComponent<BotBrain>();
+            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+                continue;
+
+            brain.ClosestLoot = null;
+            if (BotInteraction.GetClosestLoot(bot, out var closestLoot, brain.HasGun, brain.HasFood, brain.HasDrink,
+                    brain.HasHeal))
+            {
+                brain.ClosestLoot = closestLoot;
+            }
+        }
+    }
+
     private static void AssignRevives()
     {
         var players = PlayersController.instance?.players;
@@ -210,6 +234,7 @@ public class BotGameManager : MonoBehaviour
         AssignBossTargets();
         AssignInactiveBossTargets();
         AssignWaveTargets();
+        AssignClosestLoot();
         AssignRevives();
         ManageHorde();
         BotInventory.PruneExpiredDroppedItems();
