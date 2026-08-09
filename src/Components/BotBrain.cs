@@ -13,6 +13,7 @@ public class BotBrain : MonoBehaviour
     private Vector3? _targetMovePos;
     private Vector3? _targetLookPos;
     private Vector3? _backupPos;
+    public Vector3? InactiveBossPos;
     public Zombie CurrentTarget;
     public Zombie BossTarget;
     public Zombie WaveTarget;
@@ -466,26 +467,20 @@ public class BotBrain : MonoBehaviour
         }
 
         // Engage closest inactive boss corresponding to current wave
-        if (!_shouldRetreat && _hasEverything && TargetRevive == null && !BotGameManager.IsBossActive &&
-            !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss &&
-            !BotGameManager.HelicopterArrived)
+        if (!_shouldRetreat && _hasEverything && TargetRevive == null && InactiveBossPos.HasValue &&
+            !BotGameManager.IsBossActive && !WavesController.instance.HaveToKillZombies &&
+            WavesController.instance.HaveToKillBoss && !BotGameManager.HelicopterArrived)
         {
-            var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
-            var bossType = BossfightController.instance.GetZombieTypeForTier(bossTier);
-            if (BotTargetting.GetClosestInactiveBossForTier(BotPlayerMain, bossType, out var bossPos))
-            {
-                _targetMovePos = bossPos;
-                _alwaysUseGun = true;
+            _targetMovePos = InactiveBossPos.Value;
+            _alwaysUseGun = true;
 
-                if (Helpers.IsDistTo(BotPlayerMain.transform.position, (Vector3)bossPos, BotTargetting.TargetRange)
-                    && BotTargetting.GetClosestBoss(BotPlayerMain, out var boss, true)
-                    && boss.identity.type == bossType
-                    && BotTargetting.IsZombieVisible(BotPlayerMain, boss))
-                {
-                    _targetLookPos = boss.obj.transform.position;
-                    _shouldShoot = true;
-                    _shouldRun = false;
-                }
+            var botHeadPos = BotVision.GetBotHeadPosition(BotPlayerMain);
+            if (Helpers.IsDistTo(BotPlayerMain.transform.position, InactiveBossPos.Value, BotTargetting.TargetRange) &&
+                BotVision.IsPosVisible(botHeadPos, InactiveBossPos.Value))
+            {
+                _targetLookPos = InactiveBossPos.Value;
+                _shouldShoot = true;
+                _shouldRun = false;
             }
         }
 

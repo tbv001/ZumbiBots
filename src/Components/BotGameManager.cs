@@ -55,6 +55,41 @@ public class BotGameManager : MonoBehaviour
         }
     }
 
+    private static void AssignInactiveBossTargets()
+    {
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        foreach (var bot in players)
+        {
+            if (bot == null)
+                continue;
+
+            var brain = bot.GetComponent<BotBrain>();
+            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+                continue;
+
+            brain.InactiveBossPos = null;
+
+            if (WavesController.instance == null || BossfightController.instance == null)
+                continue;
+
+            if (IsBossActive || HelicopterArrived || WavesController.instance.HaveToKillZombies ||
+                !WavesController.instance.HaveToKillBoss)
+            {
+                continue;
+            }
+
+            var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
+            var bossType = BossfightController.instance.GetZombieTypeForTier(bossTier);
+            if (BotTargetting.GetClosestInactiveBossForTier(bot, bossType, out var bossPos))
+            {
+                brain.InactiveBossPos = bossPos;
+            }
+        }
+    }
+
     private static void AssignWaveTargets()
     {
         var players = PlayersController.instance?.players;
@@ -173,6 +208,7 @@ public class BotGameManager : MonoBehaviour
 
         AssignTargets();
         AssignBossTargets();
+        AssignInactiveBossTargets();
         AssignWaveTargets();
         AssignRevives();
         ManageHorde();
