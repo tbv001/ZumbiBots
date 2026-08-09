@@ -7,6 +7,7 @@ public class BotGameManager : MonoBehaviour
 {
     private float _processTime;
     public static bool IsBossActive;
+    public static bool HelicopterArrived;
 
     private static void AssignTargets()
     {
@@ -47,7 +48,7 @@ public class BotGameManager : MonoBehaviour
                 continue;
 
             brain.BossTarget = null;
-            if (BotTargetting.GetClosestBoss(bot, out var bossTarget))
+            if (!HelicopterArrived && IsBossActive && BotTargetting.GetClosestBoss(bot, out var bossTarget))
             {
                 brain.BossTarget = bossTarget;
             }
@@ -70,7 +71,7 @@ public class BotGameManager : MonoBehaviour
                 continue;
 
             brain.WaveTarget = null;
-            if (BotTargetting.GetClosestWaveZombie(bot, out var waveTarget))
+            if (!HelicopterArrived && BotTargetting.GetClosestWaveZombie(bot, out var waveTarget))
             {
                 brain.WaveTarget = waveTarget;
             }
@@ -165,6 +166,10 @@ public class BotGameManager : MonoBehaviour
 
         _processTime = 0f;
         IsBossActive = BotTargetting.IsABossActive();
+
+        var heliLanding = HelicopterLanding.Instance;
+        HelicopterArrived = heliLanding != null && heliLanding.HelicopterSpawned && !heliLanding.HelicopterLeaving &&
+                            heliLanding.HelicopterIsLanded;
 
         AssignTargets();
         AssignBossTargets();

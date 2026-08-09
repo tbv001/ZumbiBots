@@ -17,7 +17,6 @@ public class BotBrain : MonoBehaviour
     public Zombie BossTarget;
     public Zombie WaveTarget;
     private bool _moveNoMatterWhat;
-    private bool _heliIsHere;
     private bool _lootIsSack;
     private bool _alwaysUseGun;
 
@@ -401,7 +400,7 @@ public class BotBrain : MonoBehaviour
         }
 
         // Pyre/Brazier lighting
-        if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null && !_heliIsHere &&
+        if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null && !BotGameManager.HelicopterArrived &&
             WorkbenchInteractions.instance.BurningPyreCount < 12 &&
             !WavesController.instance.HaveToKillBoss)
         {
@@ -468,7 +467,8 @@ public class BotBrain : MonoBehaviour
 
         // Engage closest inactive boss corresponding to current wave
         if (!_shouldRetreat && _hasEverything && TargetRevive == null && !BotGameManager.IsBossActive &&
-            !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss && !_heliIsHere)
+            !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss &&
+            !BotGameManager.HelicopterArrived)
         {
             var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
             var bossType = BossfightController.instance.GetZombieTypeForTier(bossTier);
@@ -490,7 +490,8 @@ public class BotBrain : MonoBehaviour
         }
 
         // Engage active closest boss
-        if (_hasGun && !_shouldRetreat && TargetRevive == null && BotGameManager.IsBossActive && !_heliIsHere)
+        if (_hasGun && !_shouldRetreat && TargetRevive == null && BotGameManager.IsBossActive &&
+            !BotGameManager.HelicopterArrived)
         {
             _alwaysUseGun = true;
             if (BossTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, BossTarget))
@@ -505,7 +506,7 @@ public class BotBrain : MonoBehaviour
 
         // Engage current active wave zombies
         if (_hasGun && !_shouldRetreat && TargetRevive == null && WavesController.instance.HaveToKillZombies &&
-            !_heliIsHere)
+            !BotGameManager.HelicopterArrived)
         {
             _alwaysUseGun = true;
             if (WaveTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, WaveTarget))
@@ -565,11 +566,9 @@ public class BotBrain : MonoBehaviour
         }
 
         // GET TO THE CHOPPA! 🗣️🔥
-        var heliLanding = HelicopterLanding.Instance;
-        if (heliLanding != null && heliLanding.HelicopterSpawned && !heliLanding.HelicopterLeaving &&
-            heliLanding.HelicopterIsLanded && _hasGun && TargetRevive == null)
+        if (BotGameManager.HelicopterArrived && _hasGun && TargetRevive == null)
         {
-            _heliIsHere = true;
+            var heliLanding = HelicopterLanding.Instance;
             _alwaysUseGun = true;
             var laptop = heliLanding.Helicopter?.Laptop;
             if (laptop != null)
@@ -634,10 +633,6 @@ public class BotBrain : MonoBehaviour
                     }
                 }
             }
-        }
-        else
-        {
-            _heliIsHere = false;
         }
 
         // Retreat
