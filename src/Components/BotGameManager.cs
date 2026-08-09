@@ -7,6 +7,29 @@ public class BotGameManager : MonoBehaviour
 {
     private float _processTime;
 
+    private static void AssignTargets()
+    {
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        foreach (var bot in players)
+        {
+            if (bot == null)
+                continue;
+
+            var brain = bot.GetComponent<BotBrain>();
+            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+                continue;
+
+            brain.CurrentTarget = null;
+            if (BotTargetting.GetClosestAny(bot, out var currentTarget))
+            {
+                brain.CurrentTarget = currentTarget;
+            }
+        }
+    }
+
     private static void AssignRevives()
     {
         var players = PlayersController.instance?.players;
@@ -94,6 +117,7 @@ public class BotGameManager : MonoBehaviour
             return;
 
         _processTime = 0f;
+        AssignTargets();
         AssignRevives();
         ManageHorde();
         BotInventory.PruneExpiredDroppedItems();

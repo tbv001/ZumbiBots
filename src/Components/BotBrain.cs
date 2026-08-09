@@ -13,7 +13,7 @@ public class BotBrain : MonoBehaviour
     private Vector3? _targetMovePos;
     private Vector3? _targetLookPos;
     private Vector3? _backupPos;
-    private Zombie _currentTarget;
+    public Zombie CurrentTarget;
     private Zombie _bossTarget;
     private Zombie _waveTarget;
     private bool _moveNoMatterWhat;
@@ -307,7 +307,7 @@ public class BotBrain : MonoBehaviour
         BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink, out _hasHeal);
         BotInventory.ManageInventory(BotPlayerMain);
         _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
-        _shouldRetreat = _hasHeal && _needHeal && (_currentTarget != null || ClosestHordeCount > 0);
+        _shouldRetreat = _hasHeal && _needHeal && (CurrentTarget != null || ClosestHordeCount > 0);
 
         // Retreat
         if (ClosestHordeCount >= 5 && Helpers.IsDistTo(BotPlayerMain.transform.position, ClosestHordePos, 5f))
@@ -327,20 +327,19 @@ public class BotBrain : MonoBehaviour
         }
 
         // Targetting
-        if (!_shouldRetreat && BotTargetting.GetClosestAny(BotPlayerMain, out _currentTarget)
-                            && _currentTarget.health.isAlive)
+        if (CurrentTarget != null && CurrentTarget.health.isAlive && !_shouldRetreat)
         {
             var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
-            var isMelee = (isHoldingMelee || !_hasGun) && ClosestHordeCount <= 2 && !_currentTarget.IsBoss;
-            if ((isMelee && !_currentTarget.IsBoss) || _hasGun)
+            var isMelee = (isHoldingMelee || !_hasGun) && ClosestHordeCount <= 2 && !CurrentTarget.IsBoss;
+            if ((isMelee && !CurrentTarget.IsBoss) || _hasGun)
             {
-                var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, _currentTarget);
+                var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, CurrentTarget);
                 _targetLookPos = bestTargetHitbox;
 
                 if (isMelee)
                 {
                     _shouldStrafe = false;
-                    _targetMovePos = _currentTarget.obj.transform.position;
+                    _targetMovePos = CurrentTarget.obj.transform.position;
 
                     var equippedMelee = BotPlayerMain.arms?.EquippedMelee;
                     var baseReach = equippedMelee != null ? equippedMelee.reach : 0.8f;
@@ -348,9 +347,9 @@ public class BotBrain : MonoBehaviour
                     var effectiveReach = inMeleeState ? baseReach + 2.0f : baseReach + 1.0f;
 
                     _shouldShoot = Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, effectiveReach);
+                        CurrentTarget.obj.transform.position, effectiveReach);
                     _shouldRun = !Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, effectiveReach + 1.0f);
+                        CurrentTarget.obj.transform.position, effectiveReach + 1.0f);
                 }
                 else
                 {
@@ -370,7 +369,7 @@ public class BotBrain : MonoBehaviour
         }
         else
         {
-            _currentTarget = null;
+            CurrentTarget = null;
         }
 
         // Reload
@@ -378,7 +377,7 @@ public class BotBrain : MonoBehaviour
         {
             var curAmmo = BotInventory.GetCurAmmoCount(BotPlayerMain);
             var maxAmmo = BotInventory.GetMaxAmmoCount(BotPlayerMain);
-            if ((_currentTarget == null && curAmmo < maxAmmo) || curAmmo == 0)
+            if ((CurrentTarget == null && curAmmo < maxAmmo) || curAmmo == 0)
             {
                 _shouldReload = true;
                 _shouldRun = false;
@@ -402,7 +401,7 @@ public class BotBrain : MonoBehaviour
         }
 
         // Pyre/Brazier lighting
-        if (!_shouldRetreat && _currentTarget == null && TargetRevive == null && !_heliIsHere &&
+        if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null && !_heliIsHere &&
             WorkbenchInteractions.instance.BurningPyreCount < 12 &&
             !WavesController.instance.HaveToKillBoss)
         {
@@ -450,7 +449,7 @@ public class BotBrain : MonoBehaviour
         // Looting
         if (BotInteraction.GetClosestLoot(BotPlayerMain, out _closestLoot, _hasGun, _hasFood, _hasDrink, _hasHeal))
         {
-            if (!_shouldRetreat && _currentTarget == null && TargetRevive == null)
+            if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null)
             {
                 _lootIsSack = _closestLoot is DroppedLoot { IsSack: true };
                 _targetMovePos = _lootIsSack || _targetPyre == null || _targetPyre.IsLit
@@ -880,7 +879,7 @@ public class BotBrain : MonoBehaviour
 
         BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots);
         var bestIndex = EquipmentIndex.None;
-        switch (_currentTarget)
+        switch (CurrentTarget)
         {
             case var _ when _shouldThrow && slots.ThrowableIdx >= 0 &&
                             BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx)):
@@ -902,7 +901,7 @@ public class BotBrain : MonoBehaviour
                 bestIndex = EquipmentIndex.Misc(slots.FoodIdx);
                 break;
 
-            case var _ when _hasMelee && _currentTarget is { IsBoss: false }
+            case var _ when _hasMelee && CurrentTarget is { IsBoss: false }
                                       && ClosestHordeCount <= 2 && !_alwaysUseGun:
             {
                 if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(3)))
