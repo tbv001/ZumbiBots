@@ -15,7 +15,7 @@ public class BotBrain : MonoBehaviour
     private Vector3? _backupPos;
     public Zombie CurrentTarget;
     public Zombie BossTarget;
-    private Zombie _waveTarget;
+    public Zombie WaveTarget;
     private bool _moveNoMatterWhat;
     private bool _heliIsHere;
     private bool _lootIsSack;
@@ -507,16 +507,15 @@ public class BotBrain : MonoBehaviour
         if (_hasGun && !_shouldRetreat && TargetRevive == null && WavesController.instance.HaveToKillZombies &&
             !_heliIsHere)
         {
-            BotTargetting.GetClosestWaveZombie(BotPlayerMain, out _waveTarget);
             _alwaysUseGun = true;
-            if (_waveTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, _waveTarget))
+            if (WaveTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, WaveTarget))
             {
-                _targetMovePos = _waveTarget.obj.transform.position;
+                _targetMovePos = WaveTarget.obj.transform.position;
             }
         }
         else
         {
-            _waveTarget = null;
+            WaveTarget = null;
         }
 
         // Throw nades at horde

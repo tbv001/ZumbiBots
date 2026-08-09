@@ -54,6 +54,29 @@ public class BotGameManager : MonoBehaviour
         }
     }
 
+    private static void AssignWaveTargets()
+    {
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        foreach (var bot in players)
+        {
+            if (bot == null)
+                continue;
+
+            var brain = bot.GetComponent<BotBrain>();
+            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+                continue;
+
+            brain.WaveTarget = null;
+            if (BotTargetting.GetClosestWaveZombie(bot, out var waveTarget))
+            {
+                brain.WaveTarget = waveTarget;
+            }
+        }
+    }
+
     private static void AssignRevives()
     {
         var players = PlayersController.instance?.players;
@@ -145,6 +168,7 @@ public class BotGameManager : MonoBehaviour
 
         AssignTargets();
         AssignBossTargets();
+        AssignWaveTargets();
         AssignRevives();
         ManageHorde();
         BotInventory.PruneExpiredDroppedItems();
