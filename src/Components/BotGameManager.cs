@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ZumbiBots.Classes;
 
@@ -5,82 +6,86 @@ namespace ZumbiBots.Components;
 
 public class BotGameManager : MonoBehaviour
 {
+    private static readonly Dictionary<PlayerMain, BotBrain> BrainCache = [];
+    private static readonly HashSet<PlayerMain> AliveScratchSet = [];
+    private static int _processedBots;
     private float _processTime;
     public static bool IsBossActive;
     public static bool HelicopterArrived;
 
-    private static void AssignTargets()
+    private static BotBrain GetBrain(PlayerMain bot)
     {
-        var players = PlayersController.instance?.players;
-        if (players == null)
-            return;
+        if (BrainCache.TryGetValue(bot, out var cached) && cached != null)
+            return cached;
 
-        foreach (var bot in players)
-        {
-            if (bot == null)
-                continue;
+        var brain = bot.GetComponent<BotBrain>();
+        if (brain != null)
+            BrainCache[bot] = brain;
 
-            var brain = bot.GetComponent<BotBrain>();
-            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
-                continue;
-
-            brain.CurrentTarget = null;
-            if (BotTargetting.GetClosestAny(bot, out var currentTarget))
-            {
-                brain.CurrentTarget = currentTarget;
-            }
-        }
+        return brain;
     }
 
-    private static void AssignBossTargets()
+    private static void PruneBrainCache(List<PlayerMain> players)
     {
-        var players = PlayersController.instance?.players;
-        if (players == null)
+        if (BrainCache.Count == 0)
             return;
 
-        foreach (var bot in players)
+        AliveScratchSet.Clear();
+        foreach (var player in players)
         {
-            if (bot == null)
-                continue;
-
-            var brain = bot.GetComponent<BotBrain>();
-            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
-                continue;
-
-            brain.BossTarget = null;
-            if (!HelicopterArrived && IsBossActive && BotTargetting.GetClosestBoss(bot, out var bossTarget))
-            {
-                brain.BossTarget = bossTarget;
-            }
+            if (player != null)
+                AliveScratchSet.Add(player);
         }
+
+        if (BrainCache.Count <= AliveScratchSet.Count)
+            return;
+
+        List<PlayerMain> stale = null;
+        foreach (var key in BrainCache.Keys)
+        {
+            if (AliveScratchSet.Contains(key))
+                continue;
+
+            stale ??= [];
+            stale.Add(key);
+        }
+
+        if (stale == null)
+            return;
+
+        foreach (var key in stale)
+            BrainCache.Remove(key);
     }
 
-    private static void AssignInactiveBossTargets()
+    private static void AssignBotTargets(PlayerMain bot)
     {
-        var players = PlayersController.instance?.players;
-        if (players == null)
+        if (bot == null)
             return;
 
-        foreach (var bot in players)
+        var brain = GetBrain(bot);
+        if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
+            return;
+
+        // Set bot target
+        brain.CurrentTarget = null;
+        if (BotTargetting.GetClosestAny(bot, out var currentTarget))
         {
-            if (bot == null)
-                continue;
+            brain.CurrentTarget = currentTarget;
+        }
 
-            var brain = bot.GetComponent<BotBrain>();
-            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
-                continue;
+        // Set bot active boss target
+        brain.BossTarget = null;
+        if (!HelicopterArrived && IsBossActive && BotTargetting.GetClosestBoss(bot, out var bossTarget))
+        {
+            brain.BossTarget = bossTarget;
+        }
 
-            brain.InactiveBossPos = null;
-
-            if (WavesController.instance == null || BossfightController.instance == null)
-                continue;
-
-            if (IsBossActive || HelicopterArrived || WavesController.instance.HaveToKillZombies ||
-                !WavesController.instance.HaveToKillBoss)
-            {
-                continue;
-            }
-
+        // Set bot inactive boss target
+        brain.InactiveBossPos = null;
+        if (WavesController.instance != null && BossfightController.instance != null &&
+            !IsBossActive && !HelicopterArrived &&
+            !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss)
+        {
             var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
             var bossType = BossfightController.instance.GetZombieTypeForTier(bossTier);
             if (BotTargetting.GetClosestInactiveBossForTier(bot, bossType, out var bossPos))
@@ -88,67 +93,46 @@ public class BotGameManager : MonoBehaviour
                 brain.InactiveBossPos = bossPos;
             }
         }
-    }
 
-    private static void AssignWaveTargets()
-    {
-        var players = PlayersController.instance?.players;
-        if (players == null)
-            return;
-
-        foreach (var bot in players)
+        // Set bot zombie from wave target
+        brain.WaveTarget = null;
+        if (!HelicopterArrived && BotTargetting.GetClosestWaveZombie(bot, out var waveTarget))
         {
-            if (bot == null)
-                continue;
+            brain.WaveTarget = waveTarget;
+        }
 
-            var brain = bot.GetComponent<BotBrain>();
-            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
-                continue;
-
-            brain.WaveTarget = null;
-            if (!HelicopterArrived && BotTargetting.GetClosestWaveZombie(bot, out var waveTarget))
-            {
-                brain.WaveTarget = waveTarget;
-            }
+        // Set bot closest loot
+        brain.ClosestLoot = null;
+        if (BotInteraction.GetClosestLoot(bot, out var closestLoot, brain.HasGun, brain.HasFood, brain.HasDrink,
+                brain.HasHeal))
+        {
+            brain.ClosestLoot = closestLoot;
         }
     }
 
-    private static void AssignClosestLoot()
+    private static void ProcessBotTargetSlice(List<PlayerMain> players)
     {
-        var players = PlayersController.instance?.players;
-        if (players == null)
+        if (players.Count == 0)
             return;
 
-        foreach (var bot in players)
-        {
-            if (bot == null)
-                continue;
+        if (_processedBots >= players.Count)
+            _processedBots = 0;
 
-            var brain = bot.GetComponent<BotBrain>();
-            if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
-                continue;
+        AssignBotTargets(players[_processedBots]);
 
-            brain.ClosestLoot = null;
-            if (BotInteraction.GetClosestLoot(bot, out var closestLoot, brain.HasGun, brain.HasFood, brain.HasDrink,
-                    brain.HasHeal))
-            {
-                brain.ClosestLoot = closestLoot;
-            }
-        }
+        _processedBots++;
+        if (_processedBots >= players.Count)
+            _processedBots = 0;
     }
 
-    private static void AssignRevives()
+    private static void AssignRevives(List<PlayerMain> players)
     {
-        var players = PlayersController.instance?.players;
-        if (players == null)
-            return;
-
         foreach (var player in players)
         {
             if (player == null)
                 continue;
 
-            var brain = player.GetComponent<BotBrain>();
+            var brain = GetBrain(player);
             if (brain != null)
                 brain.TargetRevive = null;
         }
@@ -168,7 +152,7 @@ public class BotGameManager : MonoBehaviour
                 if (bot == null || bot == dyingPlayer)
                     continue;
 
-                var brain = bot.GetComponent<BotBrain>();
+                var brain = GetBrain(bot);
                 if (brain == null || bot.healthState != PlayerMain.HealthState.Alive)
                     continue;
 
@@ -188,20 +172,16 @@ public class BotGameManager : MonoBehaviour
         }
     }
 
-    private static void ManageHorde()
+    private static void ManageHorde(List<PlayerMain> players)
     {
         Horde.ComputeHordes();
-
-        var players = PlayersController.instance?.players;
-        if (players == null)
-            return;
 
         foreach (var player in players)
         {
             if (player == null)
                 continue;
 
-            var brain = player.GetComponent<BotBrain>();
+            var brain = GetBrain(player);
             if (brain == null)
                 continue;
 
@@ -219,24 +199,26 @@ public class BotGameManager : MonoBehaviour
         if (MatchController.instance?.state != MatchController.MatchState.InGame)
             return;
 
+        var players = PlayersController.instance?.players;
+        if (players == null)
+            return;
+
+        PruneBrainCache(players);
+        ProcessBotTargetSlice(players);
+
         _processTime += Time.deltaTime;
         if (_processTime < 0.1f)
             return;
 
         _processTime = 0f;
-        IsBossActive = BotTargetting.IsABossActive();
 
+        IsBossActive = BotTargetting.IsABossActive();
         var heliLanding = HelicopterLanding.Instance;
         HelicopterArrived = heliLanding != null && heliLanding.HelicopterSpawned && !heliLanding.HelicopterLeaving &&
                             heliLanding.HelicopterIsLanded;
 
-        AssignTargets();
-        AssignBossTargets();
-        AssignInactiveBossTargets();
-        AssignWaveTargets();
-        AssignClosestLoot();
-        AssignRevives();
-        ManageHorde();
+        AssignRevives(players);
+        ManageHorde(players);
         BotInventory.PruneExpiredDroppedItems();
     }
 }
