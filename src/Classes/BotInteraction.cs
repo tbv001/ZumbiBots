@@ -5,6 +5,9 @@ namespace ZumbiBots.Classes;
 
 public static class BotInteraction
 {
+    private const float NormalDoorRange = 2.25f;
+    private const float FurtherDoorRange = 5f;
+    private const float DestroyableDoorRange = 25f;
     private static readonly Vector3 LootPosOffset = new(0f, 0.1f, 0f);
     private static readonly List<InteractableFurniture> NearbyBuffer = [];
 
@@ -52,44 +55,12 @@ public static class BotInteraction
         return door == null ? Vector3.zero : door.refFXTransform.position;
     }
 
-    public static bool GetClosestInteractableDoor(PlayerMain player, out InteractableFurniture closestDoor,
-        bool furtherRange = false)
+    public static bool GetClosestDoors(PlayerMain player, out InteractableFurniture closestDoor,
+        out InteractableFurniture closestDoorFurther, out Vector3? closestDestroyableDoorPos)
     {
         closestDoor = null;
-
-        if (player == null || OptimizedFurnitureHash.instance == null)
-            return false;
-
-        var furnitures = GetNearbyFurniture(player.transform.position);
-        if (furnitures.Count == 0) return false;
-
-        var minSqrDist = float.MaxValue;
-        var playerPos = player.transform.position;
-        var interactRange = furtherRange ? 5f : 2.25f;
-
-        foreach (var furniture in furnitures)
-        {
-            if (furniture == null)
-                continue;
-
-            if (furniture.GetInteractableID() != InteractableObject.ID.Door || furniture.IsDestroyed ||
-                !furniture.CurrentlyInteractable || !furniture.CanUnlockDoor(player))
-                continue;
-
-            var sqrDist = Helpers.DistToSqr(playerPos, furniture.InteractionPoint);
-            if (!(sqrDist < minSqrDist) || !(sqrDist <= interactRange))
-                continue;
-
-            minSqrDist = sqrDist;
-            closestDoor = furniture;
-        }
-
-        return closestDoor != null;
-    }
-
-    public static bool GetClosestDestroyableDoor(PlayerMain player, out Vector3? doorHitPosition)
-    {
-        doorHitPosition = null;
+        closestDoorFurther = null;
+        closestDestroyableDoorPos = null;
 
         if (player == null || OptimizedFurnitureHash.instance == null)
             return false;
@@ -98,9 +69,10 @@ public static class BotInteraction
         if (furnitures.Count == 0)
             return false;
 
-        var minSqrDist = float.MaxValue;
         var playerPos = player.transform.position;
-
+        var minSqrDist = float.MaxValue;
+        var minSqrDistFurther = float.MaxValue;
+        var minSqrDistDestroyable = float.MaxValue;
         foreach (var furniture in furnitures)
         {
             if (furniture == null)
@@ -111,14 +83,26 @@ public static class BotInteraction
                 continue;
 
             var sqrDist = Helpers.DistToSqr(playerPos, furniture.InteractionPoint);
-            if (!(sqrDist < minSqrDist) || !(sqrDist <= 5f))
-                continue;
+            if (sqrDist <= NormalDoorRange && sqrDist < minSqrDist)
+            {
+                minSqrDist = sqrDist;
+                closestDoor = furniture;
+            }
 
-            minSqrDist = sqrDist;
-            doorHitPosition = GetDoorHitPosition(furniture);
+            if (sqrDist <= FurtherDoorRange && sqrDist < minSqrDistFurther)
+            {
+                minSqrDistFurther = sqrDist;
+                closestDoorFurther = furniture;
+            }
+
+            if (sqrDist <= DestroyableDoorRange && sqrDist < minSqrDistDestroyable)
+            {
+                minSqrDistDestroyable = sqrDist;
+                closestDestroyableDoorPos = GetDoorHitPosition(furniture);
+            }
         }
 
-        return doorHitPosition != null;
+        return closestDoor != null || closestDoorFurther != null || closestDestroyableDoorPos.HasValue;
     }
 
     public static bool GetClosestUnlitPyre(PlayerMain player, out PyreInteractable closestPyre)

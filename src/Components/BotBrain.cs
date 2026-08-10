@@ -74,6 +74,11 @@ public class BotBrain : MonoBehaviour
     // Looting
     public InteractableObject ClosestLoot;
 
+    // Door handling
+    public InteractableFurniture ClosestInteractableDoor;
+    public InteractableFurniture ClosestInteractableDoorStuck;
+    public Vector3? ClosestDestroyableDoorPos;
+
     // Random pos
     private Vector3? _randomPos;
     private float _randomPosTimer;
@@ -213,10 +218,9 @@ public class BotBrain : MonoBehaviour
             {
                 _stuckTimer = 0f;
 
-                if (BotInteraction.GetClosestInteractableDoor(BotPlayerMain, out var doorStuck, true) &&
-                    _doorStuckCd <= 0f)
+                if (ClosestInteractableDoorStuck != null && _doorStuckCd <= 0f)
                 {
-                    BotInteraction.ForceInteract(BotPlayerMain, doorStuck);
+                    BotInteraction.ForceInteract(BotPlayerMain, ClosestInteractableDoorStuck);
                     _doorInteractCd = 1f;
                     _doorStuckCd = 3f;
                     _doorStuckTimer = 1f;
@@ -245,10 +249,10 @@ public class BotBrain : MonoBehaviour
             _macroStuckTimer = 0f;
             if (Helpers.IsDistTo_2D(BotPlayerMain.transform.position, _macroStuckCheckPos, 3f))
             {
-                if (HasGun && BotInteraction.GetClosestDestroyableDoor(BotPlayerMain, out var doorHitPos))
+                if (HasGun && ClosestDestroyableDoorPos.HasValue)
                 {
                     _macroDoorTime = 2f;
-                    _macroDoorPos = doorHitPos;
+                    _macroDoorPos = ClosestDestroyableDoorPos;
                 }
 
                 _shouldJump = true;
@@ -550,11 +554,10 @@ public class BotBrain : MonoBehaviour
         }
 
         // Door handling
-        if (BotInteraction.GetClosestInteractableDoor(BotPlayerMain, out var closestDoor) &&
-            _doorInteractCd <= 0 &&
-            closestDoor.DoorState is DoorState.Closed or DoorState.Locked)
+        if (ClosestInteractableDoor != null && _doorInteractCd <= 0 &&
+            ClosestInteractableDoor.DoorState is DoorState.Closed or DoorState.Locked)
         {
-            _targetLookPos = closestDoor.InteractionPoint;
+            _targetLookPos = ClosestInteractableDoor.InteractionPoint;
             _shouldInteract = true;
             _shouldRun = false;
         }
@@ -564,6 +567,7 @@ public class BotBrain : MonoBehaviour
             _doorInteractCd -= Time.deltaTime;
         }
 
+        // Shoot at door if stuck
         if (_macroDoorTime > 0f && _macroDoorPos.HasValue)
         {
             _macroDoorTime -= Time.deltaTime;
@@ -623,7 +627,7 @@ public class BotBrain : MonoBehaviour
                 }
                 else
                 {
-                    var allPlayersNearHeli = BotGeneral.AllPlayersNearHeli(heliLanding.Helicopter.transform.position);
+                    var allPlayersNearHeli = BotGameManager.AllPlayersNearHeli;
                     if (!_shouldRetreat && TargetRevive == null)
                     {
                         _targetMovePos = allPlayersNearHeli ? laptop.InteractionPoint : outsideHeliPos;

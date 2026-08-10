@@ -12,6 +12,7 @@ public class BotGameManager : MonoBehaviour
     private float _processTime;
     public static bool IsBossActive;
     public static bool HelicopterArrived;
+    public static bool AllPlayersNearHeli;
 
     private static BotBrain GetBrain(PlayerMain bot)
     {
@@ -108,6 +109,12 @@ public class BotGameManager : MonoBehaviour
         {
             brain.ClosestLoot = closestLoot;
         }
+
+        // Set bot closest doors (interactable, stuck, and destroyable)
+        BotInteraction.GetClosestDoors(bot, out var closestDoor, out var closestDoorStuck, out var doorHitPos);
+        brain.ClosestInteractableDoor = closestDoor;
+        brain.ClosestInteractableDoorStuck = closestDoorStuck;
+        brain.ClosestDestroyableDoorPos = doorHitPos;
     }
 
     private static void ProcessBotTargetSlice(List<PlayerMain> players)
@@ -218,6 +225,8 @@ public class BotGameManager : MonoBehaviour
         var heliLanding = HelicopterLanding.Instance;
         HelicopterArrived = heliLanding != null && heliLanding.HelicopterSpawned && !heliLanding.HelicopterLeaving &&
                             heliLanding.HelicopterIsLanded;
+        AllPlayersNearHeli = HelicopterArrived && heliLanding.Helicopter != null &&
+                             BotGeneral.AllPlayersNearHeli(heliLanding.Helicopter.transform.position);
 
         AssignRevives(players);
         ManageHorde(players);
