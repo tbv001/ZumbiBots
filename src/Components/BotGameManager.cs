@@ -185,9 +185,11 @@ public class BotGameManager : MonoBehaviour
             if (brain == null)
                 continue;
 
-            brain.ClosestHordePos = Horde.GetClosestHorde(player);
-            brain.ClosestZombieInHordePos = Horde.GetClosestZombieInClosestHorde(player);
-            brain.ClosestHordeCount = Horde.GetClosestHordeCount(player);
+            var playerPos = player.transform.position;
+            var closestHorde = Horde.FindClosestHorde(playerPos, out var closestHordeCenter);
+            brain.ClosestHordePos = closestHordeCenter;
+            brain.ClosestZombieInHordePos = Horde.GetClosestZombieInClosestHorde(player, closestHorde);
+            brain.ClosestHordeCount = Horde.GetClosestHordeCount(player, closestHorde);
         }
     }
 

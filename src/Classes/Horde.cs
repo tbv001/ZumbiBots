@@ -50,56 +50,49 @@ public static class Horde
         }
     }
 
-    public static Vector3 GetClosestHorde(PlayerMain player)
+    public static Vector3 GetClosestZombieInClosestHorde(PlayerMain player, List<Zombie> horde)
     {
         if (_hordes == null || _hordes.Count == 0 || player == null)
             return Vector3.zero;
 
         var playerPos = player.transform.position;
-        var closestHorde = FindClosestHorde(playerPos);
-        return closestHorde.Count > 0 ? ComputeCenter(closestHorde) : Vector3.zero;
-    }
-
-    public static Vector3 GetClosestZombieInClosestHorde(PlayerMain player)
-    {
-        if (_hordes == null || _hordes.Count == 0 || player == null)
+        if (horde.Count == 0)
             return Vector3.zero;
 
-        var playerPos = player.transform.position;
-        var closestHorde = FindClosestHorde(playerPos);
-        if (closestHorde.Count == 0)
-            return Vector3.zero;
-
-        var closest = closestHorde[0];
+        var closest = horde[0];
         var minSqrDist = Helpers.DistToSqr(playerPos, closest.obj.transform.position);
-
-        for (var i = 1; i < closestHorde.Count; i++)
+        for (var i = 1; i < horde.Count; i++)
         {
-            var sqrDist = Helpers.DistToSqr(playerPos, closestHorde[i].obj.transform.position);
+            var sqrDist = Helpers.DistToSqr(playerPos, horde[i].obj.transform.position);
             if (sqrDist < minSqrDist)
             {
                 minSqrDist = sqrDist;
-                closest = closestHorde[i];
+                closest = horde[i];
             }
         }
 
         return closest.obj.transform.position;
     }
 
-    public static int GetClosestHordeCount(PlayerMain player)
+    public static int GetClosestHordeCount(PlayerMain player, List<Zombie> horde)
     {
         if (_hordes == null || _hordes.Count == 0 || player == null)
             return 0;
 
-        var playerPos = player.transform.position;
-        return FindClosestHorde(playerPos).Count;
+        return horde.Count;
     }
 
-    private static List<Zombie> FindClosestHorde(Vector3 playerPos)
+    public static List<Zombie> FindClosestHorde(Vector3 playerPos, out Vector3 closestCenter)
     {
-        var closestHorde = _hordes[0];
-        var minSqrDist = float.MaxValue;
+        if (_hordes == null || _hordes.Count == 0)
+        {
+            closestCenter = Vector3.zero;
+            return [];
+        }
 
+        var closestHorde = _hordes[0];
+        closestCenter = ComputeCenter(closestHorde);
+        var minSqrDist = float.MaxValue;
         foreach (var horde in _hordes)
         {
             var center = ComputeCenter(horde);
@@ -108,6 +101,7 @@ public static class Horde
             {
                 minSqrDist = sqrDist;
                 closestHorde = horde;
+                closestCenter = center;
             }
         }
 
