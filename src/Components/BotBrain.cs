@@ -102,6 +102,10 @@ public class BotBrain : MonoBehaviour
     public bool HasDrink;
     public bool HasHeal;
 
+    // In combat
+    private bool _inCombat;
+    private float _combatTimer;
+
     private void Start()
     {
         BotPlayerMain = GetComponent<PlayerMain>();
@@ -333,6 +337,7 @@ public class BotBrain : MonoBehaviour
         // Targetting
         if (CurrentTarget != null && CurrentTarget.health.isAlive && !_shouldRetreat)
         {
+            _combatTimer = 0.5f;
             var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
             var isMelee = (isHoldingMelee || !HasGun) && ClosestHordeCount <= 2 && !CurrentTarget.IsBoss;
             if ((isMelee && !CurrentTarget.IsBoss) || HasGun)
@@ -373,15 +378,22 @@ public class BotBrain : MonoBehaviour
         }
         else
         {
+            if (_combatTimer > 0f)
+            {
+                _combatTimer -= Time.deltaTime;
+            }
+
             CurrentTarget = null;
         }
+
+        _inCombat = _combatTimer > 0f;
 
         // Reload
         if (BotInventory.IsHoldingGun(BotPlayerMain))
         {
             var curAmmo = BotInventory.GetCurAmmoCount(BotPlayerMain);
             var maxAmmo = BotInventory.GetMaxAmmoCount(BotPlayerMain);
-            if ((CurrentTarget == null && curAmmo < maxAmmo) || curAmmo == 0)
+            if ((!_inCombat && curAmmo < maxAmmo) || curAmmo == 0)
             {
                 _shouldReload = true;
                 _shouldRun = false;
@@ -405,7 +417,7 @@ public class BotBrain : MonoBehaviour
         }
 
         // Pyre/Brazier lighting
-        if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null && !BotGameManager.HelicopterArrived &&
+        if (!_shouldRetreat && !_inCombat && TargetRevive == null && !BotGameManager.HelicopterArrived &&
             WorkbenchInteractions.instance.BurningPyreCount < 12 &&
             !WavesController.instance.HaveToKillBoss)
         {
@@ -453,7 +465,7 @@ public class BotBrain : MonoBehaviour
         // Looting
         if (ClosestLoot != null)
         {
-            if (!_shouldRetreat && CurrentTarget == null && TargetRevive == null)
+            if (!_shouldRetreat && !_inCombat && TargetRevive == null)
             {
                 _lootIsSack = ClosestLoot is DroppedLoot { IsSack: true };
                 _targetMovePos = _lootIsSack || _targetPyre == null || _targetPyre.IsLit
@@ -881,7 +893,7 @@ public class BotBrain : MonoBehaviour
 
         BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots);
         var bestIndex = EquipmentIndex.None;
-        switch (CurrentTarget)
+        switch (_inCombat)
         {
             case var _ when _shouldThrow && slots.ThrowableIdx >= 0 &&
                             BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx)):
@@ -893,13 +905,13 @@ public class BotBrain : MonoBehaviour
                 bestIndex = EquipmentIndex.Misc(slots.HealIdx);
                 break;
 
-            case null when _needDrink && slots.DrinkIdx >= 0 &&
-                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
+            case false when _needDrink && slots.DrinkIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
                 bestIndex = EquipmentIndex.Misc(slots.DrinkIdx);
                 break;
 
-            case null when _needEat && slots.FoodIdx >= 0 &&
-                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
+            case false when _needEat && slots.FoodIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
                 bestIndex = EquipmentIndex.Misc(slots.FoodIdx);
                 break;
 
