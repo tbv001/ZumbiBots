@@ -254,21 +254,22 @@ public static class BotInteraction
                     if (!CanLoot(loot, lobbyId))
                         continue;
 
-                    if (IsLootBlockedByDoor(player, loot.transform.position))
-                        continue;
-
-                    if (IsLootUnderwater(loot.transform.position))
+                    var lootPos = loot.transform.position;
+                    if (IsLootUnderwater(lootPos))
                         continue;
 
                     if (BotInventory.IsRecentlyDroppedByBot(player, loot))
                         continue;
 
-                    var sqrDist = Helpers.DistToSqr(playerPos, loot.transform.position);
                     var priority =
                         BotInventory.GetLootPriority(loot.item, hasGun, hasFood, hasDrink, hasHeal, needPyreFuel);
                     var isSack = loot.IsSack;
+                    var sqrDist = Helpers.DistToSqr(playerPos, lootPos);
 
                     if (!IsBetterLoot(priority, sqrDist, isSack, bestPriority, bestSqrDist, bestIsSack))
+                        continue;
+
+                    if (IsLootBlockedByDoor(player, lootPos))
                         continue;
 
                     bestPriority = priority;

@@ -1,5 +1,6 @@
 using HarmonyLib;
 using ZumbiBots.Classes;
+using ZumbiBots.Components;
 using UnityEngine;
 
 namespace ZumbiBots.Patches;
@@ -47,6 +48,18 @@ internal static class PlayerInteractionPatch
         var playerMain = __instance.playerMain;
         if (!Helpers.IsBot(playerMain))
             return;
+
+        var brain = playerMain.GetComponent<BotBrain>();
+        if (brain?.ClosestLoot != null)
+        {
+            var cachedLoot = brain.ClosestLoot;
+            var cachedSqrDist = Helpers.DistToSqr(cachedLoot.transform.position, playerMain.transform.position);
+            if (LootController.LootLootable(playerMain, cachedLoot.transform.position, cachedSqrDist))
+            {
+                __instance.AddInteraction(cachedLoot, InteractionRaycasting.None);
+                return;
+            }
+        }
 
         if (!BotInteraction.GetClosestLoot(playerMain, out var closestLoot))
             return;
