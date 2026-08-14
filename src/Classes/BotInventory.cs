@@ -8,7 +8,7 @@ public static class BotInventory
     private static readonly CraftingRecipe.Material[] PyreFuelMaterials =
         [new(InventoryItem.ID.Wood, 50), new(InventoryItem.ID.DarkBlocks, 25)];
 
-    private const float DroppedItemExpirySeconds = 30f;
+    private const float DroppedItemExpirySeconds = 120f;
     private const float DroppedItemMatchRadiusSqr = 2.25f;
 
     public static readonly Dictionary<PlayerMain, List<DroppedItemEntry>> DroppedItemsByBot = new();
@@ -39,6 +39,7 @@ public static class BotInventory
         ManageOtherWeaponSlots(inventory);
         ManageConsumableSlots(player);
         DiscardNonExplosiveThrowables(player);
+        ManageDuplicates(inventory);
     }
 
     private static bool IsPrimaryGun(InventoryItem item)
@@ -422,6 +423,115 @@ public static class BotInventory
                 RecordDrop(inventory.playerMain, item);
                 inventory.RemoveItem(item);
                 inventory.DropLoot(item);
+            }
+        }
+    }
+
+    public static void ManageDuplicates(PlayerInventory inventory)
+    {
+        if (inventory?.playerMain == null || ItemsBase.instance == null)
+            return;
+
+        for (var i = 0; i < inventory.equippedItems.UnlockedMiscSlotsCount; i++)
+        {
+            var equipped = inventory.equippedItems.GetMisc(i);
+            if (equipped == null || equipped.IsNone || equipped.IsEmpty())
+                continue;
+
+            var dbEquipped = equipped.GetDataBaseItem();
+            if (dbEquipped == null || dbEquipped.stackMax <= 1)
+                continue;
+
+            foreach (var storageItem in inventory.storage.items.ToArray())
+            {
+                if (storageItem == null || storageItem.IsNone || storageItem.IsEmpty() || storageItem.id != equipped.id)
+                    continue;
+
+                PlayerInventory.ProcessItemStacking(storageItem, equipped);
+                if (storageItem.stackCount <= 0)
+                {
+                    inventory.storage.items.Remove(storageItem);
+                }
+
+                if (equipped.stackCount >= dbEquipped.stackMax)
+                    break;
+            }
+        }
+
+        for (var i = 0; i < inventory.storage.items.Count; i++)
+        {
+            var targetItem = inventory.storage.items[i];
+            if (targetItem == null || targetItem.IsNone || targetItem.IsEmpty())
+                continue;
+
+            var dbTarget = targetItem.GetDataBaseItem();
+            if (dbTarget == null || dbTarget.stackMax <= 1)
+                continue;
+
+            for (var j = i + 1; j < inventory.storage.items.Count; j++)
+            {
+                var sourceItem = inventory.storage.items[j];
+                if (sourceItem == null || sourceItem.IsNone || sourceItem.IsEmpty() || sourceItem.id != targetItem.id)
+                    continue;
+
+                PlayerInventory.ProcessItemStacking(sourceItem, targetItem);
+                if (sourceItem.stackCount <= 0)
+                {
+                    inventory.storage.items.RemoveAt(j);
+                    j--;
+                }
+
+                if (targetItem.stackCount >= dbTarget.stackMax)
+                    break;
+            }
+        }
+
+        var seenEquippedIds = new HashSet<InventoryItem.ID>();
+        foreach (var equipped in inventory.equippedItems.AllItems())
+        {
+            if (equipped == null || equipped.IsNone || equipped.IsEmpty() || equipped.id == InventoryItem.ID.None)
+                continue;
+
+            seenEquippedIds.Add(equipped.id);
+        }
+
+        var itemsByGroup = new Dictionary<InventoryItem.ID, List<InventoryItem>>();
+        foreach (var item in inventory.storage.items)
+        {
+            if (item == null || item.id == InventoryItem.ID.None || item.IsEmpty())
+                continue;
+
+            if (!itemsByGroup.TryGetValue(item.id, out var list))
+            {
+                list = [];
+                itemsByGroup[item.id] = list;
+            }
+
+            list.Add(item);
+        }
+
+        foreach (var (id, items) in itemsByGroup)
+        {
+            items.Sort((a, b) => a.stackCount.CompareTo(b.stackCount));
+
+            var duplicateCount = seenEquippedIds.Contains(id) ? items.Count : items.Count - 1;
+            for (var i = 0; i < duplicateCount; i++)
+            {
+                var duplicateItem = items[i];
+                var dbItem = duplicateItem.GetDataBaseItem();
+                if (dbItem == null)
+                    continue;
+
+                if (dbItem.CanScrap)
+                {
+                    ScrappingUtils.ScrapItem(duplicateItem, inventory);
+                }
+                else
+                {
+                    RecordDrop(inventory.playerMain, duplicateItem);
+                    inventory.RemoveItem(duplicateItem);
+                    inventory.DropLoot(duplicateItem);
+                }
             }
         }
     }
