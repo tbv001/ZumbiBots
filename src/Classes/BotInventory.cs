@@ -8,7 +8,7 @@ public static class BotInventory
     private static readonly CraftingRecipe.Material[] PyreFuelMaterials =
         [new(InventoryItem.ID.Wood, 50), new(InventoryItem.ID.DarkBlocks, 25)];
 
-    private const float DroppedItemExpirySeconds = 30f;
+    private const float DroppedItemExpirySeconds = 120f;
     private const float DroppedItemMatchRadiusSqr = 2.25f;
 
     public static readonly Dictionary<PlayerMain, List<DroppedItemEntry>> DroppedItemsByBot = new();
