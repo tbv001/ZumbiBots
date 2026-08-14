@@ -4,6 +4,7 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using ZumbiBots.Components;
+using ZumbiBots.Classes;
 
 namespace ZumbiBots;
 
@@ -19,6 +20,7 @@ public class ZumbiBots : BaseUnityPlugin
         Logger = base.Logger;
         try
         {
+            Configuration.RegisterConfig(Config);
             gameObject.AddComponent<BotMenu>();
             gameObject.AddComponent<BotManager>();
             gameObject.AddComponent<BotGameManager>();
