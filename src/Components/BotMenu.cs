@@ -15,7 +15,7 @@ public class BotMenu : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.P) && BotManager.BotIsAvailable)
+        if (Input.GetKeyDown(Configuration.MenuToggleKey.Value) && BotManager.BotIsAvailable)
         {
             _showGui = !_showGui;
         }
