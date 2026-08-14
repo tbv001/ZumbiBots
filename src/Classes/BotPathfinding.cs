@@ -5,7 +5,7 @@ namespace ZumbiBots.Classes;
 
 public class BotPathfinding(PlayerMain playerMain)
 {
-    private const float _pathSmoothing = 5f;
+    private const float PathSmoothing = 5f;
     private uint _targetId;
     private Transform _targetTransform;
     private Vector3 _smoothedDirection;
@@ -121,14 +121,14 @@ public class BotPathfinding(PlayerMain playerMain)
                 else
                 {
                     _smoothedDirection = Vector3.Slerp(_smoothedDirection, CurrentOrder.Direction,
-                        Time.deltaTime * _pathSmoothing);
+                        Time.deltaTime * PathSmoothing);
                 }
 
                 break;
             }
             case false:
                 _smoothedDirection = Vector3.Lerp(_smoothedDirection, Vector3.zero,
-                    Time.deltaTime * _pathSmoothing);
+                    Time.deltaTime * PathSmoothing);
                 break;
         }
     }

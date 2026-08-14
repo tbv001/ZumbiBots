@@ -752,12 +752,6 @@ public static class BotInventory
         return eq != null && !eq.IsNone && !eq.IsEmpty();
     }
 
-    public static bool IsEquipSlotAvailable(PlayerMain playerMain, int slot)
-    {
-        var index = slot < 4 ? EquipmentIndex.Weapon(slot) : EquipmentIndex.Misc(slot - 4);
-        return IsEquipSlotAvailable(playerMain, index);
-    }
-
     public static bool HasPyreFuel(PlayerMain player)
     {
         return player?.inventory != null && CraftingRecipe.CanCraft(player.inventory, PyreFuelMaterials);

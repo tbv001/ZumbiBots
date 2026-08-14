@@ -4,7 +4,7 @@ namespace ZumbiBots.Classes;
 
 public static class BotInput
 {
-    private const float _aimSpeed = 10f;
+    private const float AimSpeed = 10f;
 
     public static void ClearInput(PlayerMain playerMain)
     {
@@ -30,7 +30,8 @@ public static class BotInput
         var targetPitch = Mathf.Clamp(pitchAngle, -80f, 80f);
         if (playerMain.SpineControl != null)
         {
-            playerMain.SpineControl.camAng = Mathf.Lerp(playerMain.SpineControl.camAng, targetPitch, Time.deltaTime * _aimSpeed);
+            playerMain.SpineControl.camAng =
+                Mathf.Lerp(playerMain.SpineControl.camAng, targetPitch, Time.deltaTime * AimSpeed);
         }
 
         dir.y = 0;
@@ -38,7 +39,7 @@ public static class BotInput
         {
             var targetRot = Quaternion.LookRotation(dir);
             transform.rotation =
-                Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * _aimSpeed);
+                Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * AimSpeed);
         }
 
         playerMain.input.mouseX = 0f;

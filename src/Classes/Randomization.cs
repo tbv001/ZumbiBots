@@ -28,6 +28,7 @@ public static class Randomization
             SkinID.Paramedic,
             SkinID.Miner
         };
+
         return availableSkinIDs[UnityEngine.Random.Range(0, availableSkinIDs.Length)];
     }
 }
