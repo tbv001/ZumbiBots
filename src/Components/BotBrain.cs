@@ -13,11 +13,11 @@ public class BotBrain : MonoBehaviour
     private Vector3? _targetMovePos;
     private Vector3? _targetLookPos;
     private Vector3? _backupPos;
-    private Zombie _currentTarget;
-    private Zombie _bossTarget;
-    private Zombie _waveTarget;
+    public Vector3? InactiveBossPos;
+    public Zombie CurrentTarget;
+    public Zombie BossTarget;
+    public Zombie WaveTarget;
     private bool _moveNoMatterWhat;
-    private bool _heliIsHere;
     private bool _lootIsSack;
     private bool _alwaysUseGun;
 
@@ -26,6 +26,7 @@ public class BotBrain : MonoBehaviour
     private float _doorInteractCd;
     private float _backupTimer;
     private float _statDebugTimer;
+    private float _needsTimer;
 
     // Stuck handling
     private Vector3 _lastStuckPos;
@@ -71,11 +72,20 @@ public class BotBrain : MonoBehaviour
     private float _throwTime;
 
     // Looting
-    private InteractableObject _closestLoot;
+    public InteractableObject ClosestLoot;
+
+    // Door handling
+    public InteractableFurniture ClosestInteractableDoor;
+    public InteractableFurniture ClosestInteractableDoorStuck;
+    public Vector3? ClosestDestroyableDoorPos;
 
     // Random pos
     private Vector3? _randomPos;
     private float _randomPosTimer;
+
+    // Vault spot
+    private float _vaultSpotTimer;
+    private Vector3? _vaultSpotPos;
 
     // Bot input
     private bool _shouldShoot;
@@ -90,12 +100,16 @@ public class BotBrain : MonoBehaviour
     private bool _needDrink;
     private bool _needHeal;
     private bool _needStaminaRegen;
-    private bool _hasGun;
-    private bool _hasMelee;
-    private bool _hasFood;
-    private bool _hasDrink;
-    private bool _hasHeal;
     private bool _hasEverything;
+    private bool _hasMelee;
+    public bool HasGun;
+    public bool HasFood;
+    public bool HasDrink;
+    public bool HasHeal;
+
+    // In combat
+    private bool _inCombat;
+    private float _combatTimer;
 
     private void Start()
     {
@@ -135,9 +149,6 @@ public class BotBrain : MonoBehaviour
         _shouldInteract = false;
         _shouldStrafe = false;
         _moveNoMatterWhat = false;
-        _needEat = false;
-        _needDrink = false;
-        _needHeal = false;
         _lootIsSack = false;
         _shouldRetreat = false;
         _alwaysUseGun = false;
@@ -207,10 +218,9 @@ public class BotBrain : MonoBehaviour
             {
                 _stuckTimer = 0f;
 
-                if (BotInteraction.GetClosestInteractableDoor(BotPlayerMain, out var doorStuck, true) &&
-                    _doorStuckCd <= 0f)
+                if (ClosestInteractableDoorStuck != null && _doorStuckCd <= 0f)
                 {
-                    BotInteraction.ForceInteract(BotPlayerMain, doorStuck);
+                    BotInteraction.ForceInteract(BotPlayerMain, ClosestInteractableDoorStuck);
                     _doorInteractCd = 1f;
                     _doorStuckCd = 3f;
                     _doorStuckTimer = 1f;
@@ -239,10 +249,10 @@ public class BotBrain : MonoBehaviour
             _macroStuckTimer = 0f;
             if (Helpers.IsDistTo_2D(BotPlayerMain.transform.position, _macroStuckCheckPos, 3f))
             {
-                if (_hasGun && BotInteraction.GetClosestDestroyableDoor(BotPlayerMain, out var doorHitPos))
+                if (HasGun && ClosestDestroyableDoorPos.HasValue)
                 {
                     _macroDoorTime = 2f;
-                    _macroDoorPos = doorHitPos;
+                    _macroDoorPos = ClosestDestroyableDoorPos;
                 }
 
                 _shouldJump = true;
@@ -270,44 +280,46 @@ public class BotBrain : MonoBehaviour
         }
 
         // Needs
-        if (BotPlayerMain.statusEffects?.statusEffect != null)
+        _needsTimer += Time.deltaTime;
+        if (_needsTimer > 1f)
         {
-            foreach (var effect in BotPlayerMain.statusEffects.statusEffect)
+            _needsTimer = 0f;
+            if (BotPlayerMain.statusEffects?.statusEffect != null)
             {
-                if (effect == null)
-                    continue;
-
-                switch (effect.id)
+                foreach (var effect in BotPlayerMain.statusEffects.statusEffect)
                 {
-                    case StatusEffect.ID.Drink:
-                    {
-                        var effectPercentage = effect.curValue / effect.maxValue;
-                        if (effectPercentage > 0.5f)
-                            continue;
+                    if (effect == null)
+                        continue;
 
-                        _needDrink = true;
-                        break;
-                    }
-                    case StatusEffect.ID.Food:
+                    switch (effect.id)
                     {
-                        var effectPercentage = effect.curValue / effect.maxValue;
-                        if (effectPercentage > 0.5f)
-                            continue;
-
-                        _needEat = true;
-                        break;
+                        case StatusEffect.ID.Drink:
+                        {
+                            var effectPercentage = effect.curValue / effect.maxValue;
+                            _needDrink = effectPercentage < 0.5f;
+                            break;
+                        }
+                        case StatusEffect.ID.Food:
+                        {
+                            var effectPercentage = effect.curValue / effect.maxValue;
+                            _needEat = effectPercentage < 0.5f;
+                            break;
+                        }
                     }
                 }
             }
+
+            var maxHealthPercentage = BotPlayerMain.healthSlow / BotPlayerMain.MaxHealth;
+            var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
+            _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
+
+            BotInventory.CheckNeeds(BotPlayerMain, out HasGun, out _hasMelee, out HasFood, out HasDrink,
+                out HasHeal);
+            BotInventory.ManageInventory(BotPlayerMain);
+            _hasEverything = HasGun && HasFood && HasDrink && HasHeal;
         }
 
-        var maxHealthPercentage = BotPlayerMain.healthSlow / BotPlayerMain.MaxHealth;
-        var healthPercentage = BotPlayerMain.healthFast / BotPlayerMain.MaxHealth;
-        _needHeal = healthPercentage < 0.3f || maxHealthPercentage < 0.6f;
-        BotInventory.CheckNeeds(BotPlayerMain, out _hasGun, out _hasMelee, out _hasFood, out _hasDrink, out _hasHeal);
-        BotInventory.ManageInventory(BotPlayerMain);
-        _hasEverything = _hasGun && _hasFood && _hasDrink && _hasHeal;
-        _shouldRetreat = _hasHeal && _needHeal && (_currentTarget != null || ClosestHordeCount > 0);
+        _shouldRetreat = HasHeal && _needHeal && (CurrentTarget != null || ClosestHordeCount > 0);
 
         // Retreat
         if (ClosestHordeCount >= 5 && Helpers.IsDistTo(BotPlayerMain.transform.position, ClosestHordePos, 5f))
@@ -327,20 +339,20 @@ public class BotBrain : MonoBehaviour
         }
 
         // Targetting
-        if (!_shouldRetreat && BotTargetting.GetClosestAny(BotPlayerMain, out _currentTarget)
-                            && _currentTarget.health.isAlive)
+        if (CurrentTarget != null && CurrentTarget.health.isAlive && !_shouldRetreat)
         {
+            _combatTimer = 0.5f;
             var isHoldingMelee = BotInventory.IsHoldingMelee(BotPlayerMain) || BotPlayerMain.arms?.EquippedItem == null;
-            var isMelee = (isHoldingMelee || !_hasGun) && ClosestHordeCount <= 2 && !_currentTarget.IsBoss;
-            if ((isMelee && !_currentTarget.IsBoss) || _hasGun)
+            var isMelee = (isHoldingMelee || !HasGun) && ClosestHordeCount <= 2 && !CurrentTarget.IsBoss;
+            if ((isMelee && !CurrentTarget.IsBoss) || HasGun)
             {
-                var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, _currentTarget);
+                var bestTargetHitbox = BotTargetting.GetBestHitbox(BotPlayerMain, CurrentTarget);
                 _targetLookPos = bestTargetHitbox;
 
                 if (isMelee)
                 {
                     _shouldStrafe = false;
-                    _targetMovePos = _currentTarget.obj.transform.position;
+                    _targetMovePos = CurrentTarget.obj.transform.position;
 
                     var equippedMelee = BotPlayerMain.arms?.EquippedMelee;
                     var baseReach = equippedMelee != null ? equippedMelee.reach : 0.8f;
@@ -348,9 +360,9 @@ public class BotBrain : MonoBehaviour
                     var effectiveReach = inMeleeState ? baseReach + 2.0f : baseReach + 1.0f;
 
                     _shouldShoot = Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, effectiveReach);
+                        CurrentTarget.obj.transform.position, effectiveReach);
                     _shouldRun = !Helpers.IsDistTo(BotPlayerMain.transform.position,
-                        _currentTarget.obj.transform.position, effectiveReach + 1.0f);
+                        CurrentTarget.obj.transform.position, effectiveReach + 1.0f);
                 }
                 else
                 {
@@ -370,15 +382,22 @@ public class BotBrain : MonoBehaviour
         }
         else
         {
-            _currentTarget = null;
+            if (_combatTimer > 0f)
+            {
+                _combatTimer -= Time.deltaTime;
+            }
+
+            CurrentTarget = null;
         }
+
+        _inCombat = _combatTimer > 0f;
 
         // Reload
         if (BotInventory.IsHoldingGun(BotPlayerMain))
         {
             var curAmmo = BotInventory.GetCurAmmoCount(BotPlayerMain);
             var maxAmmo = BotInventory.GetMaxAmmoCount(BotPlayerMain);
-            if ((_currentTarget == null && curAmmo < maxAmmo) || curAmmo == 0)
+            if ((!_inCombat && curAmmo < maxAmmo) || curAmmo == 0)
             {
                 _shouldReload = true;
                 _shouldRun = false;
@@ -402,7 +421,7 @@ public class BotBrain : MonoBehaviour
         }
 
         // Pyre/Brazier lighting
-        if (!_shouldRetreat && _currentTarget == null && TargetRevive == null && !_heliIsHere &&
+        if (!_shouldRetreat && !_inCombat && TargetRevive == null && !BotGameManager.HelicopterArrived &&
             WorkbenchInteractions.instance.BurningPyreCount < 12 &&
             !WavesController.instance.HaveToKillBoss)
         {
@@ -448,19 +467,19 @@ public class BotBrain : MonoBehaviour
         }
 
         // Looting
-        if (BotInteraction.GetClosestLoot(BotPlayerMain, out _closestLoot, _hasGun, _hasFood, _hasDrink, _hasHeal))
+        if (ClosestLoot != null)
         {
-            if (!_shouldRetreat && _currentTarget == null && TargetRevive == null)
+            if (!_shouldRetreat && !_inCombat && TargetRevive == null)
             {
-                _lootIsSack = _closestLoot is DroppedLoot { IsSack: true };
+                _lootIsSack = ClosestLoot is DroppedLoot { IsSack: true };
                 _targetMovePos = _lootIsSack || _targetPyre == null || _targetPyre.IsLit
-                    ? _closestLoot.transform.position + Vector3.up
+                    ? ClosestLoot.transform.position + Vector3.up
                     : _targetMovePos;
             }
 
-            if (Helpers.IsDistTo(BotPlayerMain.transform.position, _closestLoot.transform.position, 2f))
+            if (Helpers.IsDistTo(BotPlayerMain.transform.position, ClosestLoot.transform.position, 2f))
             {
-                _targetLookPos = _closestLoot.transform.position;
+                _targetLookPos = ClosestLoot.transform.position;
                 _shouldShoot = false;
                 _shouldInteract = true;
                 _shouldRun = false;
@@ -468,57 +487,51 @@ public class BotBrain : MonoBehaviour
         }
 
         // Engage closest inactive boss corresponding to current wave
-        if (!_shouldRetreat && _hasEverything && TargetRevive == null && !BotTargetting.IsABossActive() &&
-            !WavesController.instance.HaveToKillZombies && WavesController.instance.HaveToKillBoss && !_heliIsHere)
+        if (!_shouldRetreat && _hasEverything && TargetRevive == null && InactiveBossPos.HasValue &&
+            !BotGameManager.IsBossActive && !WavesController.instance.HaveToKillZombies &&
+            WavesController.instance.HaveToKillBoss && !BotGameManager.HelicopterArrived)
         {
-            var bossTier = WavesController.instance.CurrentlyEnabledBossTier;
-            var bossType = BossfightController.instance.GetZombieTypeForTier(bossTier);
-            if (BotTargetting.GetClosestInactiveBossForTier(BotPlayerMain, bossType, out var bossPos))
-            {
-                _targetMovePos = bossPos;
-                _alwaysUseGun = true;
+            _targetMovePos = InactiveBossPos.Value;
+            _alwaysUseGun = true;
 
-                if (Helpers.IsDistTo(BotPlayerMain.transform.position, (Vector3)bossPos, BotTargetting.TargetRange)
-                    && BotTargetting.GetClosestBoss(BotPlayerMain, out var boss, true)
-                    && boss.identity.type == bossType
-                    && BotTargetting.IsZombieVisible(BotPlayerMain, boss))
-                {
-                    _targetLookPos = boss.obj.transform.position;
-                    _shouldShoot = true;
-                    _shouldRun = false;
-                }
+            var botHeadPos = BotVision.GetBotHeadPosition(BotPlayerMain);
+            if (Helpers.IsDistTo(BotPlayerMain.transform.position, InactiveBossPos.Value, BotTargetting.TargetRange) &&
+                BotVision.IsPosVisible(botHeadPos, InactiveBossPos.Value))
+            {
+                _targetLookPos = InactiveBossPos.Value;
+                _shouldShoot = true;
+                _shouldRun = false;
             }
         }
 
         // Engage active closest boss
-        if (_hasGun && !_shouldRetreat && TargetRevive == null && BotTargetting.IsABossActive() && !_heliIsHere)
+        if (HasGun && !_shouldRetreat && TargetRevive == null && BotGameManager.IsBossActive &&
+            !BotGameManager.HelicopterArrived)
         {
-            BotTargetting.GetClosestBoss(BotPlayerMain, out _bossTarget);
             _alwaysUseGun = true;
-            if (_bossTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, _bossTarget))
+            if (BossTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, BossTarget))
             {
-                _targetMovePos = _bossTarget.obj.transform.position;
+                _targetMovePos = BossTarget.obj.transform.position;
             }
         }
         else
         {
-            _bossTarget = null;
+            BossTarget = null;
         }
 
         // Engage current active wave zombies
-        if (_hasGun && !_shouldRetreat && TargetRevive == null && WavesController.instance.HaveToKillZombies &&
-            !_heliIsHere)
+        if (HasGun && !_shouldRetreat && TargetRevive == null && WavesController.instance.HaveToKillZombies &&
+            !BotGameManager.HelicopterArrived)
         {
-            BotTargetting.GetClosestWaveZombie(BotPlayerMain, out _waveTarget);
             _alwaysUseGun = true;
-            if (_waveTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, _waveTarget))
+            if (WaveTarget != null && !BotTargetting.IsZombieVisible(BotPlayerMain, WaveTarget))
             {
-                _targetMovePos = _waveTarget.obj.transform.position;
+                _targetMovePos = WaveTarget.obj.transform.position;
             }
         }
         else
         {
-            _waveTarget = null;
+            WaveTarget = null;
         }
 
         // Throw nades at horde
@@ -541,11 +554,10 @@ public class BotBrain : MonoBehaviour
         }
 
         // Door handling
-        if (BotInteraction.GetClosestInteractableDoor(BotPlayerMain, out var closestDoor) &&
-            _doorInteractCd <= 0 &&
-            closestDoor.DoorState is DoorState.Closed or DoorState.Locked)
+        if (ClosestInteractableDoor != null && _doorInteractCd <= 0 &&
+            ClosestInteractableDoor.DoorState is DoorState.Closed or DoorState.Locked)
         {
-            _targetLookPos = closestDoor.InteractionPoint;
+            _targetLookPos = ClosestInteractableDoor.InteractionPoint;
             _shouldInteract = true;
             _shouldRun = false;
         }
@@ -555,6 +567,7 @@ public class BotBrain : MonoBehaviour
             _doorInteractCd -= Time.deltaTime;
         }
 
+        // Shoot at door if stuck
         if (_macroDoorTime > 0f && _macroDoorPos.HasValue)
         {
             _macroDoorTime -= Time.deltaTime;
@@ -568,11 +581,9 @@ public class BotBrain : MonoBehaviour
         }
 
         // GET TO THE CHOPPA! 🗣️🔥
-        var heliLanding = HelicopterLanding.Instance;
-        if (heliLanding != null && heliLanding.HelicopterSpawned && !heliLanding.HelicopterLeaving &&
-            heliLanding.HelicopterIsLanded && _hasGun && TargetRevive == null)
+        if (BotGameManager.HelicopterArrived && HasGun && TargetRevive == null)
         {
-            _heliIsHere = true;
+            var heliLanding = HelicopterLanding.Instance;
             _alwaysUseGun = true;
             var laptop = heliLanding.Helicopter?.Laptop;
             if (laptop != null)
@@ -616,7 +627,7 @@ public class BotBrain : MonoBehaviour
                 }
                 else
                 {
-                    var allPlayersNearHeli = BotGeneral.AllPlayersNearHeli(heliLanding.Helicopter.transform.position);
+                    var allPlayersNearHeli = BotGameManager.AllPlayersNearHeli;
                     if (!_shouldRetreat && TargetRevive == null)
                     {
                         _targetMovePos = allPlayersNearHeli ? laptop.InteractionPoint : outsideHeliPos;
@@ -637,10 +648,6 @@ public class BotBrain : MonoBehaviour
                     }
                 }
             }
-        }
-        else
-        {
-            _heliIsHere = false;
         }
 
         // Retreat
@@ -759,9 +766,19 @@ public class BotBrain : MonoBehaviour
         }
 
         var moveDir = resultingMoveVec - BotPlayerMain.transform.position;
-        if (BotInteraction.TryGetClosestVaultSpot(BotPlayerMain.transform.position, moveDir, out var vaultPos))
+        _vaultSpotTimer += Time.deltaTime;
+        if (_vaultSpotTimer > 0.1f)
         {
-            _targetLookPos = vaultPos;
+            _vaultSpotTimer = 0f;
+            _vaultSpotPos =
+                BotInteraction.TryGetClosestVaultSpot(BotPlayerMain.transform.position, moveDir, out var vaultPos)
+                    ? vaultPos
+                    : null;
+        }
+
+        if (_vaultSpotPos.HasValue)
+        {
+            _targetLookPos = _vaultSpotPos.Value;
             _shouldJump = true;
         }
 
@@ -880,7 +897,7 @@ public class BotBrain : MonoBehaviour
 
         BotInventory.BotSlots.TryGetValue(BotPlayerMain, out var slots);
         var bestIndex = EquipmentIndex.None;
-        switch (_currentTarget)
+        switch (_inCombat)
         {
             case var _ when _shouldThrow && slots.ThrowableIdx >= 0 &&
                             BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.ThrowableIdx)):
@@ -892,17 +909,17 @@ public class BotBrain : MonoBehaviour
                 bestIndex = EquipmentIndex.Misc(slots.HealIdx);
                 break;
 
-            case null when _needDrink && slots.DrinkIdx >= 0 &&
-                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
+            case false when _needDrink && slots.DrinkIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.DrinkIdx)):
                 bestIndex = EquipmentIndex.Misc(slots.DrinkIdx);
                 break;
 
-            case null when _needEat && slots.FoodIdx >= 0 &&
-                           BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
+            case false when _needEat && slots.FoodIdx >= 0 &&
+                            BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Misc(slots.FoodIdx)):
                 bestIndex = EquipmentIndex.Misc(slots.FoodIdx);
                 break;
 
-            case var _ when _hasMelee && _currentTarget is { IsBoss: false }
+            case var _ when _hasMelee && CurrentTarget is { IsBoss: false }
                                       && ClosestHordeCount <= 2 && !_alwaysUseGun:
             {
                 if (BotInventory.IsEquipSlotAvailable(BotPlayerMain, EquipmentIndex.Weapon(3)))
